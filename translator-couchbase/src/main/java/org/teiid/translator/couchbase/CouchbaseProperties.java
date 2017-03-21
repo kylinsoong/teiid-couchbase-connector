@@ -25,12 +25,17 @@ public interface CouchbaseProperties {
     
     String WAVE = "`"; //$NON-NLS-1$
     String COLON = ":"; //$NON-NLS-1$
-    String DOT = "."; //$NON-NLS-1$
+    String SOURCE_SEPARATOR = "."; //$NON-NLS-1$
     String PLACEHOLDER = "$"; //$NON-NLS-1$
     String LINE = "_"; //$NON-NLS-1$
     String JSON = "json"; //$NON-NLS-1$ 
     String PK = "PK"; //$NON-NLS-1$
     String UNDERSCORE = "_"; //$NON-NLS-1$
+    String IDX_SUFFIX = "_idx"; //$NON-NLS-1$
+    String DIM_SUFFIX = "_dim"; //$NON-NLS-1$
+    
+    String TRUE_VALUE = "true"; //$NON-NLS-1$
+    String FALSE_VALUE = "false"; //$NON-NLS-1$
     
     String DEFAULT_NAMESPACE = "default"; //$NON-NLS-1$
     String DEFAULT_TYPENAME = "type"; //$NON-NLS-1$

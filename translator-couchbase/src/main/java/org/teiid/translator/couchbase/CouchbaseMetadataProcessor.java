@@ -32,7 +32,7 @@ import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.LONG;
 import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.FLOAT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.COLON;
-import static org.teiid.translator.couchbase.CouchbaseProperties.DOT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.SOURCE_SEPARATOR;
 import static org.teiid.translator.couchbase.CouchbaseProperties.PLACEHOLDER;
 import static org.teiid.translator.couchbase.CouchbaseProperties.LINE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.UNDERSCORE;
@@ -44,6 +44,9 @@ import static org.teiid.translator.couchbase.CouchbaseProperties.DEFAULT_NAMESPA
 import static org.teiid.translator.couchbase.CouchbaseProperties.DEFAULT_TYPENAME;
 import static org.teiid.translator.couchbase.CouchbaseProperties.SQL_QUERYT_KEYSPACES;
 import static org.teiid.translator.couchbase.CouchbaseProperties.REPLACE_TARGET;
+import static org.teiid.translator.couchbase.CouchbaseProperties.TRUE_VALUE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.IDX_SUFFIX;
+import static org.teiid.translator.couchbase.CouchbaseProperties.DIM_SUFFIX;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -130,20 +133,8 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             String keyspace = row.value().getString(NAME);
             generateTables(metadataFactory, connection, namespace, keyspace);  
         }
-        
-        
        
-//        String keyspace = connection.getKeyspaceName();
-//        
-//        // Map data documents to tables
-//        Iterator<N1qlQueryRow> result = connection.executeQuery(buildN1ql(keyspace)).iterator();
-//        while(result.hasNext()) {
-//            N1qlQueryRow row = result.next();
-//            JsonObject doc = row.value().getObject(JSON);
-//            addTable(connection, metadataFactory, keyspace, doc, null);       
-//        }
-//        
-//        addProcedures(metadataFactory, connection);
+        addProcedures(metadataFactory, connection);
         
     }
 
@@ -269,7 +260,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             }
             addTable(connection, metadataFactory, key, (JsonObject)value, table);
         } else if(value instanceof JsonArray) {
-            String nameInSource = table.getNameInSource() + DOT + wave(key);
+            String nameInSource = table.getNameInSource() + SOURCE_SEPARATOR + wave(key);
             String nameInTeiid = table.getName() + UNDERSCORE + key;
             String referenceTableName = table.getName();
             addTable(connection, metadataFactory, nameInSource, nameInTeiid, referenceTableName, (JsonArray)value, 0);
@@ -290,7 +281,25 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             table.setSupportsUpdate(true);
             table.setNameInSource(nameInSource);
             metadataFactory.addForiegnKey("FK0", Arrays.asList(DOCUMENTID), referenceTableName, table);
+            table.setProperty(IS_ARRAY_TABLE, TRUE_VALUE);
+            
+            //add array index column
+            Column idx = metadataFactory.addColumn(tableName + IDX_SUFFIX, INTEGER, table);
+            idx.setUpdatable(false);
         }
+        
+        Iterator<Object> items = array.iterator();
+        while(items.hasNext()) {
+            Object item = items.next();
+            if(item instanceof JsonObject) {
+                
+            } else if (item instanceof JsonArray) {
+                
+            } else {
+                
+            }
+        }
+        
     }
 
     /**
@@ -507,7 +516,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
         StringBuilder sb = new StringBuilder();
         if(parentPath != null) {
             sb.append(parentPath);
-            sb.append(DOT);
+            sb.append(SOURCE_SEPARATOR);
         }
         sb.append(WAVE);
         sb.append(path);
