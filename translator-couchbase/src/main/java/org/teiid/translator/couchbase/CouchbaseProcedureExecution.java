@@ -21,14 +21,14 @@
  */
 package org.teiid.translator.couchbase;
 
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.GETTEXTDOCUMENTS;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.GETDOCUMENTS;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.GETTEXTDOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.GETDOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.SAVEDOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.DELETEDOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.GETTEXTMETADATADOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.GETMETADATADOCUMENT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.GETDOCUMENT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.GETDOCUMENTS;
+import static org.teiid.translator.couchbase.CouchbaseProperties.GETMETADATADOCUMENT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTDOCUMENT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTDOCUMENTS;
+import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTMETADATADOCUMENT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.SAVEDOCUMENT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.DELETEDOCUMENT;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.ID;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.RESULT;
 

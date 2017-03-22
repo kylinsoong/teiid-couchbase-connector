@@ -27,7 +27,6 @@ public interface CouchbaseProperties {
     String COLON = ":"; //$NON-NLS-1$
     String SOURCE_SEPARATOR = "."; //$NON-NLS-1$
     String PLACEHOLDER = "$"; //$NON-NLS-1$
-    String LINE = "_"; //$NON-NLS-1$
     String JSON = "json"; //$NON-NLS-1$ 
     String PK = "PK"; //$NON-NLS-1$
     String UNDERSCORE = "_"; //$NON-NLS-1$
@@ -42,9 +41,15 @@ public interface CouchbaseProperties {
     String TPYENAME_MATCHER_PATTERN = "([a-zA-Z_]\\w*|(?:`[^`]*`)+):([a-zA-Z_]\\w*|(?:`[^`]*`)+)(?:$|,)"; //$NON-NLS-1$
 
     String NAME = "name"; //$NON-NLS-1$
-    String REPLACE_TARGET = "${PLACEHOLDER}"; //$NON-NLS-1$
     String DOCUMENTID = "_documentId"; //$NON-NLS-1$
     
-    String SQL_QUERYT_NAMESPACES = "SELECT name FROM system:namespaces"; //$NON-NLS-1$
-    String SQL_QUERYT_KEYSPACES = "SELECT name, namespace_id FROM system:keyspaces WHERE namespace_id = '${PLACEHOLDER}'"; //$NON-NLS-1$
+    String GETTEXTDOCUMENTS = "getTextDocuments"; //$NON-NLS-1$
+    String GETDOCUMENTS = "getDocuments"; //$NON-NLS-1$
+    String GETTEXTDOCUMENT = "getTextDocument"; //$NON-NLS-1$
+    String GETDOCUMENT = "getDocument"; //$NON-NLS-1$
+    String SAVEDOCUMENT = "saveDocument"; //$NON-NLS-1$
+    String DELETEDOCUMENT = "deleteDocument"; //$NON-NLS-1$
+    String GETMETADATADOCUMENT  = "getMetadataDocument"; //$NON-NLS-1$
+    String GETTEXTMETADATADOCUMENT  = "getTextMetadataDocument"; //$NON-NLS-1$
+
 }
