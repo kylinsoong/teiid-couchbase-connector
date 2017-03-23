@@ -21,7 +21,7 @@
  */
 package org.teiid.translator.couchbase;
 
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.buildPlaceholder;
+import static org.teiid.translator.couchbase.CouchbaseProperties.PLACEHOLDER;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -152,6 +152,10 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
             return row;
 	    }
         return null;
+    }
+	
+	private String buildPlaceholder(int i) {
+        return PLACEHOLDER + i; 
     }
 
     @Override

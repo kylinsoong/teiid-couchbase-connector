@@ -55,14 +55,15 @@ public class TestN1QLVisitor {
             MetadataFactory mf = new MetadataFactory("couchbase", 1, SystemMetadata.getInstance().getRuntimeTypeMap(), mmd);
             CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
             Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-            mp.addTable(conn, mf, KEYSPACE, formCustomer(), null);
-            mp.addTable(conn, mf, KEYSPACE, formOder(), null);
-            mp.addTable(conn, mf, KEYSPACE, formSimpleJson(), null);
-            mp.addTable(conn, mf, KEYSPACE, formJson(), null);
-            mp.addTable(conn, mf, KEYSPACE, formArray(), null);
-            mp.addTable(conn, mf, KEYSPACE, layerJson(), null);
-            mp.addTable(conn, mf, KEYSPACE, layerArray(), null);
-            mp.addTable(conn, mf, KEYSPACE, nestedArray(), null);
+            //TODO--
+//            mp.addTable(conn, mf, KEYSPACE, formCustomer(), null);
+//            mp.addTable(conn, mf, KEYSPACE, formOder(), null);
+//            mp.addTable(conn, mf, KEYSPACE, formSimpleJson(), null);
+//            mp.addTable(conn, mf, KEYSPACE, formJson(), null);
+//            mp.addTable(conn, mf, KEYSPACE, formArray(), null);
+//            mp.addTable(conn, mf, KEYSPACE, layerJson(), null);
+//            mp.addTable(conn, mf, KEYSPACE, layerArray(), null);
+//            mp.addTable(conn, mf, KEYSPACE, nestedArray(), null);
             mp.addProcedures(mf, null);
 
             TransformationMetadata tm = RealMetadataFactory.createTransformationMetadata(mf.asMetadataStore(), "x");

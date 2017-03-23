@@ -22,12 +22,18 @@
 package org.teiid.translator.couchbase;
 
 import static org.junit.Assert.*;
+import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.STRING;
+import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENTID;
+import static org.teiid.translator.couchbase.CouchbaseProperties.FALSE_VALUE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
+import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_ARRAY_TABLE;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -42,8 +48,10 @@ import org.mockito.Mockito;
 import org.teiid.core.util.UnitTestUtil;
 import org.teiid.couchbase.CouchbaseConnection;
 import org.teiid.metadata.MetadataFactory;
+import org.teiid.metadata.Table;
 import org.teiid.query.metadata.DDLStringVisitor;
 import org.teiid.query.metadata.SystemMetadata;
+import org.teiid.translator.couchbase.CouchbaseMetadataProcessor.Dimension;
 
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
@@ -52,32 +60,26 @@ import com.couchbase.client.java.document.json.JsonObject;
 public class TestCouchbaseMetadataProcessor {
     
     static final String KEYSPACE = "test";
- 
+    
     @Test
-    public void testMetadata() throws ResourceException {
-        
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
+    public void testCustomerOrder() throws ResourceException {
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        // Two documents under keyspace
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formCustomer(), null);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formOder(), null);
+        Table table = this.createTable(mf, KEYSPACE);
+        mp.scanRow(KEYSPACE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, formOder(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("customerOrder.expected", mf);
     }
     
     @Test
-    public void testMetadataMultiple() throws ResourceException {
-        
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
+    public void testCustomerOrderMultiple() throws ResourceException {
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        // multiple documents with same structure under keyspace
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formCustomer(), null);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formCustomer(), null);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formOder(), null);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formOder(), null);
+        Table table = this.createTable(mf, KEYSPACE);
+        mp.scanRow(KEYSPACE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, formOder(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, formOder(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("customerOrder.expected", mf);
     }
     
@@ -88,7 +90,7 @@ public class TestCouchbaseMetadataProcessor {
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
         CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
         Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, KEYSPACE, layerJson());
+//        metadataProcessor.addTable(conn, mf, KEYSPACE, KEYSPACE, layerJson());
         helpTest("layerJson.expected", mf);
     }
     
@@ -98,7 +100,7 @@ public class TestCouchbaseMetadataProcessor {
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
         CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
         Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        metadataProcessor.addTable(conn, mf,  KEYSPACE, layerArray(), null);
+//        metadataProcessor.addTable(conn, mf,  KEYSPACE, layerArray(), null);
         helpTest("layerArray.expected", mf);
     }
     
@@ -108,7 +110,7 @@ public class TestCouchbaseMetadataProcessor {
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
         CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
         Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        metadataProcessor.addTable(conn, mf,  KEYSPACE, formArray(), null);
+//        metadataProcessor.addTable(conn, mf,  KEYSPACE, formArray(), null);
         helpTest("complexArray.expected", mf);
     }
     
@@ -119,7 +121,7 @@ public class TestCouchbaseMetadataProcessor {
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
         CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
         Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formSimpleJson(), null);
+//        metadataProcessor.addTable(conn, mf, KEYSPACE, formSimpleJson(), null);
         helpTest("simpleJson.expected", mf);
     }
     
@@ -130,7 +132,7 @@ public class TestCouchbaseMetadataProcessor {
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
         CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
         Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, formJson(), null);
+//        metadataProcessor.addTable(conn, mf, KEYSPACE, formJson(), null);
         helpTest("completeJson.expected", mf);
     }
     
@@ -141,7 +143,7 @@ public class TestCouchbaseMetadataProcessor {
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
         CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
         Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-        metadataProcessor.addTable(conn, mf, KEYSPACE, nestedArray(), null);
+//        metadataProcessor.addTable(conn, mf, KEYSPACE, nestedArray(), null);
         helpTest("nestedArray.expected", mf);
     }
 
@@ -157,7 +159,7 @@ public class TestCouchbaseMetadataProcessor {
                 .put("name", "value")
                 .put("Name", "value")
                 .put("nAmE", "value");
-        metadataProcessor.addTable(conn, mf, KEYSPACE, json, null);
+//        metadataProcessor.addTable(conn, mf, KEYSPACE, json, null);
         helpTest("TODO.expected", mf);
     }
     
@@ -170,14 +172,28 @@ public class TestCouchbaseMetadataProcessor {
         helpTest("procedures.expected", mf);
     }
     
+    private Table createTable(MetadataFactory mf, String keyspace) {
+        Table table = mf.addTable(keyspace);
+        table.setNameInSource(WAVE + keyspace + WAVE);
+        table.setSupportsUpdate(true);
+        table.setProperty(IS_ARRAY_TABLE, FALSE_VALUE);
+        mf.addColumn(DOCUMENTID, STRING, table);
+        mf.addPrimaryKey("PK0", Arrays.asList(DOCUMENTID), table); //$NON-NLS-1$
+        return table;
+    }
+    
     static JsonObject formCustomer() {
-        return JsonObject.create().put("Name", "John Doe").put("ID", "Customer_101").put("Type", "Customer").put("SavedAddresses", JsonArray.from("123 Main St.", "456 1st Ave"));
+        return JsonObject.create()
+                .put("Name", "John Doe")
+                .put("ID", "Customer_101")
+                .put("type", "Customer")
+                .put("SavedAddresses", JsonArray.from("123 Main St.", "456 1st Ave"));
     }
     
     static JsonObject formOder() {
         return JsonObject.create()
                 .put("Name", "Air Ticket")
-                .put("Type", "Oder")
+                .put("type", "Oder")
                 .put("CustomerID", "Customer_101")
                 .put("CreditCard", JsonObject.create().put("Type", "Visa").put("CardNumber", "4111 1111 1111 111").put("Expiry", "12/12").put("CVN", 123))
                 .put("Items", JsonArray.from(JsonObject.create().put("ItemID", 89123).put("Quantity", 1), JsonObject.create().put("ItemID", 92312).put("Quantity", 5)));

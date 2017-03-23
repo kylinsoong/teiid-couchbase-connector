@@ -27,16 +27,15 @@ import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.INTEGER;
 import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.COLON;
 import static org.teiid.translator.couchbase.CouchbaseProperties.SOURCE_SEPARATOR;
-import static org.teiid.translator.couchbase.CouchbaseProperties.PLACEHOLDER;
 import static org.teiid.translator.couchbase.CouchbaseProperties.UNDERSCORE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.NAME;
-import static org.teiid.translator.couchbase.CouchbaseProperties.PK;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENTID;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DEFAULT_NAMESPACE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.TRUE_VALUE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.FALSE_VALUE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.IDX_SUFFIX;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DIM_SUFFIX;
+import static org.teiid.translator.couchbase.CouchbaseProperties.SQUARE_BRACKETS;
 import static org.teiid.translator.couchbase.CouchbaseProperties.GETDOCUMENT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.GETDOCUMENTS;
 import static org.teiid.translator.couchbase.CouchbaseProperties.GETMETADATADOCUMENT;
@@ -82,26 +81,14 @@ import com.couchbase.client.java.query.N1qlQueryRow;
 
 public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseConnection> {
     
-    public static final String IS_TOP_TABLE = MetadataFactory.COUCHBASE_URI + "ISTOPTABLE"; //$NON-NLS-1$
     public static final String IS_ARRAY_TABLE = MetadataFactory.COUCHBASE_URI + "ISARRAYTABLE"; //$NON-NLS-1$
     public static final String ARRAY_TABLE_GROUP = MetadataFactory.COUCHBASE_URI + "ARRAYTABLEGROUP"; //$NON-NLS-1$
+  
+    private Integer sampleSize;
     
-    public static final String TRUE = "true"; //$NON-NLS-1$
-    public static final String FALSE = "false"; //$NON-NLS-1$
-    
-//    public static final String PK = "PK"; //$NON-NLS-1$
-    public static final String DOCUMENT_ID = "documentId"; //$NON-NLS-1$
-    
-    public static final String ID = "id"; //$NON-NLS-1$ 
-    public static final String RESULT = "result"; //$NON-NLS-1$ 
-    
-    private int sampleSize = 100;
-    
-    private String typeNameList; //$NON-NLS-1$
+    private String typeNameList; 
     
     private Map<String, String> typeNameMap;
-    
-    private Map<String, Table> tableValueMap  = new HashMap<>();
             
     @Override
     public void process(MetadataFactory mf, CouchbaseConnection conn) throws TranslatorException {
@@ -206,30 +193,49 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             if(dataSrcTableList.size() == 1 && dataSrcTableList.get(0).equals(keyspace)) {
                 hasTypeIdentifier = false;
             }
-            String query = buildN1QLQuery(typeName, name, namespace, keyspace, getSampleSize(), hasTypeIdentifier);
+            
+            if(this.sampleSize == null || this.sampleSize == 0) {  
+                this.sampleSize = 100; // default sample size is 100
+                LogManager.logInfo(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29008, this.sampleSize));
+            }
+            
+            String query = buildN1QLQuery(typeName, name, namespace, keyspace, this.sampleSize, hasTypeIdentifier);
             LogManager.logTrace(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29003, query)); 
             Iterator<N1qlQueryRow> result = conn.executeQuery(query).iterator();
             while(result.hasNext()) {
                 JsonObject row = result.next().value(); // result.next() always can not be null
-                String docuemntId = row.getString(PK);
                 JsonObject currentRowJson = row.getObject(keyspace);
-                scanRow(keyspace, docuemntId, currentRowJson, mf, conn, table, tableName, false);
+                scanRow(keyspace, currentRowJson, mf, table, tableName, false, new Dimension());
             }            
         }
     }
 
-    private void scanRow(String keyspace, String docuemntId, JsonValue jsonValue, MetadataFactory mf, CouchbaseConnection conn, Table table, String referenceTableName, boolean isNestedType) {
+    /**
+     * A dispatcher of scan jsonValue(document, of a segment of document), the jsonValue either can be a JsonObject, or JsonArray, 
+     * different type dispatch to different scan method.
+     * 
+     * @param keyspace - Couchbase keyspace, or typed table name.
+     * @param jsonValue - JsonObject/JsonArray which may contain nested JsonObject/JsonArray
+     * @param mf
+     * @param conn
+     * @param table
+     * @param referenceTableName - The top table name, used to add foreign key
+     * @param isNestedType - Whether the jsonValue are a nested value, or the jsonValue is a segment of document
+     * @param dimension - The dimension of nested array, for example, "{"nestedArray": [[["nestedArray"]]]}", the dimension
+     *                    deepest array is 3
+     */
+    protected void scanRow(String keyspace, JsonValue jsonValue, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
         
-        LogManager.logTrace(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29013, table, keyspace, docuemntId, jsonValue));
+        LogManager.logTrace(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29013, table, keyspace, jsonValue));
         
         if(isObjectJsonType(jsonValue)) {
-            scanObjectRow(keyspace, docuemntId, (JsonObject)jsonValue, mf, conn, table, referenceTableName, isNestedType);
+            scanObjectRow(keyspace, (JsonObject)jsonValue, mf, table, referenceTableName, isNestedType, dimension);
         } else if (isArrayJsonType(jsonValue)) {
-            scanArrayRow(keyspace, docuemntId, (JsonArray)jsonValue, mf, conn, table, referenceTableName, isNestedType);
+            scanArrayRow(keyspace, (JsonArray)jsonValue, mf, table, referenceTableName, isNestedType, dimension);
         }
     }
 
-    private void scanObjectRow(String keyspace, String docuemntId, JsonObject json, MetadataFactory mf, CouchbaseConnection conn, Table table, String referenceTableName, boolean isNestedType) {
+    private void scanObjectRow(String keyspace, JsonObject json, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
         
         Set<String> names = json.getNames();
         
@@ -241,67 +247,119 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             if(columnType.equals(OBJECT)) {
                 JsonValue jsonValue = (JsonValue) columnValue;
                 if(isObjectJsonType(columnValue)) {
-                    
+                    scanRow(keyspace, jsonValue, mf, table, referenceTableName, true, dimension);
                 } else if(isArrayJsonType(columnValue)) {
                     String tableName = table.getName() + UNDERSCORE + columnName;
-                    String tableNameInSource = table.getNameInSource() + SOURCE_SEPARATOR + nameInSource(columnName);
-                    Table subTable = null;
-                    if (mf.getSchema().getTable(tableName) != null) {
-                        subTable = mf.getSchema().getTable(tableName);
-                    } else {
-                        subTable = mf.addTable(tableName);
-                        subTable.setNameInSource(tableNameInSource);
-                        subTable.setSupportsUpdate(true);
-                        subTable.setProperty(IS_ARRAY_TABLE, TRUE_VALUE);
-                        mf.addColumn(DOCUMENTID, STRING, subTable);
-                        mf.addForiegnKey("FK0", Arrays.asList(DOCUMENTID), referenceTableName, subTable);
-                        Column idx = mf.addColumn(tableName + IDX_SUFFIX, INTEGER, subTable);
-                        idx.setUpdatable(false);
-                    } 
-                    scanRow(keyspace, docuemntId, jsonValue, mf, conn, subTable, referenceTableName, true);
+                    String tableNameInSource = table.getNameInSource() + SOURCE_SEPARATOR + nameInSource(columnName) + SQUARE_BRACKETS ;
+                    Table subTable = addTable(tableName, tableNameInSource, true, referenceTableName, dimension, mf);
+                    scanRow(keyspace, jsonValue, mf, subTable, referenceTableName, true, dimension);
                 }
             } else {
                 String columnNameInSource = nameInSource(name);
                 if(isNestedType) {
                     columnName = table.getName() + UNDERSCORE + columnName;
-                    columnNameInSource = table.getNameInSource() + SOURCE_SEPARATOR + columnNameInSource;
                 }
-                if (table.getColumnByName(columnName) == null) {
-                    Column column = mf.addColumn(columnName, columnType, table);
-                    column.setNameInSource(columnNameInSource);
-                    column.setUpdatable(true);
-                }
+                addColumn(columnName, columnType, columnValue, true, columnNameInSource, table, mf);
             }
         } 
     }
 
-    private void scanArrayRow(String keyspace, String docuemntId, JsonArray array, MetadataFactory mf, CouchbaseConnection conn, Table table, String referenceTableName, boolean isNestedType) {
+    private void scanArrayRow(String keyspace, JsonArray array, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
         
         if(array.size() > 0) {
             for(int i = 0 ; i < array.size() ; i ++) {
                 Object element = array.get(i);
                 if(isObjectJsonType(element)) {
+                    JsonObject json = (JsonObject) element;
+                    
+                    for(String name : json.getNames()) {
+                        Object columnValue = json.get(name);
+                        String columnType = this.getDataType(columnValue);
+                        if(columnType.equals(OBJECT)) {
+                            JsonValue jsonValue = (JsonValue) columnValue;
+                            if(isObjectJsonType(jsonValue)) {
+                                scanRow(keyspace, jsonValue, mf, table, referenceTableName, true, dimension);
+                            } else if (isArrayJsonType(jsonValue)) {
+                                String tableName = table.getName() + UNDERSCORE + name + UNDERSCORE + dimension.get();
+                                String tableNameInSrc = table.getNameInSource() + SOURCE_SEPARATOR + this.nameInSource(name) + SQUARE_BRACKETS;
+                                Table subTable = addTable(tableName, tableNameInSrc, true, referenceTableName, dimension, mf);
+                                scanRow(keyspace, jsonValue, mf, subTable, referenceTableName, true, dimension);
+                            }
+                        } else {
+                            String columnName = table.getName() + UNDERSCORE + name;
+                            addColumn(columnName, columnType, columnValue, true, nameInSource(name), table, mf);
+                        }
+                    }
                     
                 } else if(isArrayJsonType(element)) {
-                    
+                    String tableName = table.getName() + UNDERSCORE + dimension.get();
+                    String tableNameInSrc = table.getNameInSource() + SQUARE_BRACKETS;
+                    Table subTable = addTable(tableName, tableNameInSrc, true, referenceTableName, dimension, mf);
+                    scanRow(keyspace, (JsonValue)element, mf, subTable, referenceTableName, true, dimension);
                 } else {
                     String elementType = getDataType(element);
                     String columnName = table.getName();
-                    //TODO-- here need more address
-                    if (table.getColumnByName(columnName) != null) {
-                        Column column = table.getColumnByName(columnName);
-                        if(!column.getDatatype().getName().equals(elementType) && !column.getDatatype().getName().equals(OBJECT)) {
-                            Datatype datatype = mf.getDataTypes().get(OBJECT);
-                            column.setDatatype(datatype, true, 0);
-                        }
-                    } else {
-                        Column column = mf.addColumn(columnName, elementType, table);
-                        column.setUpdatable(true);
-                    }
+                    addColumn(columnName, elementType, element, true, null, table, mf);
                 }
             }
         } else {
-            //TODO-- handle empty array []
+            String columnName = table.getName();
+            addColumn(columnName, null, null, true, null, table, mf);
+        }
+    }
+    
+
+    /**
+     * Principle used to map document-format nested JsonArray to JDBC-compatible Table:
+     *   1) If nested array contains differently-typed elements and no elements are Json document, all elements be 
+     *      map to same column with Object type.
+     *   2) If nested array contains Json document, all keys be map to Column name, and reference value data type be
+     *      map to Column data type
+     *   3) If nested array contains other nested array, or nested array's Json document item contains nested arrays/documents
+     *      these nested arrays/documents be treated as Object
+     *   4) A index column used to indicate the index in array.
+     */
+    private Table addTable(String tableName, String nameInSource, boolean updatable, String referenceTableName, Dimension dimension, MetadataFactory mf) {
+
+        Table table = null;
+        if (mf.getSchema().getTable(tableName) != null) {
+            table = mf.getSchema().getTable(tableName);
+        } else {
+            table = mf.addTable(tableName);
+            table.setNameInSource(nameInSource);
+            table.setSupportsUpdate(updatable);
+            table.setProperty(IS_ARRAY_TABLE, TRUE_VALUE);
+            mf.addColumn(DOCUMENTID, STRING, table);
+            mf.addForiegnKey("FK0", Arrays.asList(DOCUMENTID), referenceTableName, table); //$NON-NLS-1$
+            Column idx = mf.addColumn(tableName + IDX_SUFFIX, INTEGER, table);
+            idx.setUpdatable(false);
+            dimension.increment();
+        } 
+        
+        return table;
+    }
+
+    private void addColumn(String columnName, String columnType, Object columnValue, boolean updatable, String nameInSource, Table table, MetadataFactory mf) {
+        
+        if(columnType == null && columnValue == null && table.getColumnByName(columnName) == null) {
+            columnType = TypeFacility.RUNTIME_NAMES.STRING;
+        } else if (columnType == null && columnValue == null && table.getColumnByName(columnName) != null) {
+            columnType = table.getColumnByName(columnName).getDatatype().getName();
+        }
+        
+        if (table.getColumnByName(columnName) == null) {
+            Column column = mf.addColumn(columnName, columnType, table);
+            column.setUpdatable(updatable);
+            if(nameInSource != null){
+                column.setNameInSource(nameInSource);
+            }
+        } else {
+            Column column = table.getColumnByName(columnName);
+            String existColumnType = column.getDatatype().getName();
+            if(!existColumnType.equals(columnType) && !existColumnType.equals(OBJECT) && columnValue != null) {
+                Datatype datatype = mf.getDataTypes().get(OBJECT);
+                column.setDatatype(datatype, true, 0);
+            }
         }
     }
 
@@ -312,202 +370,11 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
     private boolean isArrayJsonType(Object jsonValue) {
         return jsonValue instanceof JsonArray;
     }
-
-    @Deprecated
-    protected Table addTable(CouchbaseConnection connection, MetadataFactory metadataFactory, String keyspace, String sourceTableName, JsonObject value) {
-        
-        Table table = null;
-        
-        if (metadataFactory.getSchema().getTable(sourceTableName) != null) {
-            table = metadataFactory.getSchema().getTable(sourceTableName);
-        } else {
-            table = metadataFactory.addTable(sourceTableName);
-            metadataFactory.addColumn(DOCUMENTID, STRING, table);
-            table.setSupportsUpdate(true);
-            table.setNameInSource(buildNameInSource(keyspace, null));
-            metadataFactory.addPrimaryKey("PK0", Arrays.asList(DOCUMENTID), table); //$NON-NLS-1$
-            table.setProperty(IS_ARRAY_TABLE, FALSE_VALUE);
-        }
-        
-        for(String key : value.getNames()) {
-            addColumn(connection, metadataFactory, keyspace, table, null, key, value.get(key));
-        }
-        
-        return table;
-    }
-
-    @Deprecated
-    protected void addTable(CouchbaseConnection connection, MetadataFactory metadataFactory, String key, JsonObject doc, Table parent) {
-
-//        Table table = null;
-//        String tableName = key;
-//        if(parent != null) {
-//            tableName = parent.getName() + LINE + key;
-//        }
-//        if (metadataFactory.getSchema().getTable(tableName) != null) {
-//            table = metadataFactory.getSchema().getTable(tableName);
-//        } else {
-//            table = metadataFactory.addTable(tableName);
-//            metadataFactory.addColumn(DOCUMENT_ID, STRING, table);
-//            table.setSupportsUpdate(true);
-//            if(parent == null) {
-//                // The top Table have a unique primary key.
-//                table.setNameInSource(buildNameInSource(key, null));
-//                table.setProperty(IS_TOP_TABLE, TRUE);
-//                metadataFactory.addPrimaryKey("PK0", Arrays.asList(DOCUMENT_ID), table); //$NON-NLS-1$
-//            } else {
-//                table.setNameInSource(buildNameInSource(key, parent.getNameInSource()));
-//                table.setProperty(IS_TOP_TABLE, FALSE);
-//                metadataFactory.addForiegnKey("FK0", Arrays.asList(DOCUMENT_ID), connection.getKeyspaceName(), table);
-//            }
-//            table.setProperty(IS_ARRAY_TABLE, FALSE);
-//        }
-//
-//        // add more columns
-//        for(String keyCol : doc.getNames()) {
-//            addColumn(connection, metadataFactory, table, keyCol, doc.get(keyCol));
-//        }
-    }
-    
-    @Deprecated
-    private void addColumn(CouchbaseConnection connection, MetadataFactory metadataFactory, String keyspace, Table table, String prefix, String key, Object value) {
-        
-        //TODO-- couchbase is case sensitive
-        String columnName = key;
-        if(prefix != null) {
-            columnName = prefix + UNDERSCORE + key;
-        }
-        if (table.getColumnByName(columnName) != null) {            
-            return ;
-        }
-        
-        String columnType = getDataType(value);
-        
-        if(value instanceof JsonObject) {
-            JsonObject nestedObject = (JsonObject)value;
-            for(String nestedKey : nestedObject.getNames()) {
-                String nestedPrefix = nestedKey;
-                if(prefix != null) {
-                    nestedPrefix = prefix + UNDERSCORE + key;
-                }
-                addColumn(connection, metadataFactory, keyspace, table, nestedPrefix, nestedKey, nestedObject.get(nestedKey));
-            }
-            addTable(connection, metadataFactory, key, (JsonObject)value, table);
-        } else if(value instanceof JsonArray) {
-            //TODO--
-            String nameInSource = table.getNameInSource() + SOURCE_SEPARATOR + nameInSource(key);
-            String tableName = table.getName() + UNDERSCORE + key;
-            String referenceTableName = table.getName();
-            addArrayTable(connection, metadataFactory, nameInSource, tableName, referenceTableName, (JsonArray)value, 0);
-        } else {
-            Column column = metadataFactory.addColumn(columnName, columnType, table);
-            column.setUpdatable(true);
-        }
-    }
-
-    @Deprecated
-    private void addArrayTable(CouchbaseConnection connection, MetadataFactory metadataFactory, String nameInSource, String tableName, String referenceTableName, JsonArray array, int dimension) {
-
-        Table table = null;
-        if (metadataFactory.getSchema().getTable(tableName) != null) {
-            table = metadataFactory.getSchema().getTable(tableName);
-        } else {
-            table = metadataFactory.addTable(tableName);
-            metadataFactory.addColumn(DOCUMENTID, STRING, table);
-            table.setSupportsUpdate(true);
-            table.setNameInSource(nameInSource);
-            metadataFactory.addForiegnKey("FK0", Arrays.asList(DOCUMENTID), referenceTableName, table);
-            table.setProperty(IS_ARRAY_TABLE, TRUE_VALUE);
-            
-            //add array index column
-            Column idx = metadataFactory.addColumn(tableName + IDX_SUFFIX, INTEGER, table);
-            idx.setUpdatable(false);
-            
-            dimension++;
-        }
-        
-        Iterator<Object> items = array.iterator();
-        while(items.hasNext()) {
-            Object item = items.next();
-            if(item instanceof JsonObject) {
-                
-            } else if (item instanceof JsonArray) {
-                
-            } else {
-                
-            }
-        }
-        
-    }
-
-    /**
-     * Map document-format nested JsonArray to JDBC-compatible Table:
-     *  If nested array contains differently-typed elements and no elements are Json document, all elements be 
-     *  map to same column with Object type.
-     *  If nested array contains Json document, all keys be map to Column name, and reference value data type be
-     *  map to Column data type
-     *  If nested array contains other nested array, or nested array's Json document item contains nested arrays/documents
-     *  these nested arrays/documents be treated as Object
-     * @param metadataFactory
-     * @param key
-     * @param value
-     * @param parent
-     */
-    @Deprecated
-    private void addTable(CouchbaseConnection connection, MetadataFactory metadataFactory, String key, JsonArray value, Table parent) {
-        
-        Table table = null;
-        String tableName = parent.getName() + UNDERSCORE  + key;
-        if (metadataFactory.getSchema().getTable(tableName) != null) {
-            table = metadataFactory.getSchema().getTable(tableName);
-        } else {
-            table = metadataFactory.addTable(tableName);
-            metadataFactory.addColumn(DOCUMENT_ID, STRING, table);
-            table.setSupportsUpdate(true);
-            table.setNameInSource(buildNameInSource(key, parent.getNameInSource()));
-            table.setProperty(IS_ARRAY_TABLE, TRUE);
-            table.setProperty(IS_TOP_TABLE, FALSE);
-            table.setProperty(ARRAY_TABLE_GROUP, key);
-            metadataFactory.addForiegnKey("FK0", Arrays.asList(DOCUMENT_ID), connection.getKeyspaceName(), table);
-        }
-        
-        Iterator<Object> items = value.iterator();
-        while(items.hasNext()) {
-            Object item = items.next();
-            if(item instanceof JsonObject) {
-                JsonObject nestedJson = (JsonObject) item;
-                for(String keyCol : nestedJson.getNames()) {
-                    String arrayType = getDataType(nestedJson.get(keyCol));
-                    if(table.getColumnByName(keyCol) != null) {
-                        Column column = table.getColumnByName(keyCol);
-                        if(!column.getDatatype().getName().equals(arrayType) && !column.getDatatype().getName().equals(OBJECT)) {
-                            Datatype datatype = metadataFactory.getDataTypes().get(OBJECT);
-                            column.setDatatype(datatype, true, 0);
-                        }
-                    } else {
-                        Column column = metadataFactory.addColumn(keyCol, arrayType, table);
-                        column.setUpdatable(true);
-                    }
-                }
-            } else {
-                String arrayType = getDataType(item);
-                if (table.getColumnByName(key) != null) {
-                    Column column = table.getColumnByName(key);
-                    if(!column.getDatatype().getName().equals(arrayType) && !column.getDatatype().getName().equals(OBJECT)) {
-                        Datatype datatype = metadataFactory.getDataTypes().get(OBJECT);
-                        column.setDatatype(datatype, true, 0);
-                    }
-                } else {
-                    Column column = metadataFactory.addColumn(key, arrayType, table);
-                    column.setUpdatable(true);
-                }
-            }
-        }
-    }
     
     private String getTypeName(String keyspace) {
         
         if(this.typeNameList == null) {
+            LogManager.logWarning(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29009));
             return null;
         }
         
@@ -633,9 +500,9 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
         sb.append(WAVE).append(keyspace).append(WAVE);
         sb.append(buildN1QLFrom(namespace, keyspace));
         if(hasTypeIdentifier) {
-            sb.append(" WHERE ").append(columnIdentifierName).append("='").append(typedValue).append("'");
+            sb.append(" WHERE ").append(columnIdentifierName).append("='").append(typedValue).append("'"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
         }
-        sb.append(" LIMIT ").append(sampleSize);
+        sb.append(" LIMIT ").append(sampleSize); //$NON-NLS-1$ 
         return sb.toString();
     }
     
@@ -663,27 +530,6 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
     private String nameInSource(String path) {
         return WAVE + path + WAVE; 
     }
-    
-    public static String buildNameInSource(String path) {
-        return buildNameInSource(path, null);
-    }
-    
-    public static String buildNameInSource(String path, String parentPath) {
-        StringBuilder sb = new StringBuilder();
-        if(parentPath != null) {
-            sb.append(parentPath);
-            sb.append(SOURCE_SEPARATOR);
-        }
-        sb.append(WAVE);
-        sb.append(path);
-        sb.append(WAVE);
-        String nameInSource = sb.toString();
-        return nameInSource;
-    }
-    
-    public static String buildPlaceholder(int i) {
-        return PLACEHOLDER + i; 
-    }
 
     @TranslatorProperty(display = "SampleSize", category = PropertyType.IMPORT, description = "Maximum number of documents per keyspace that should be map") //$NON-NLS-1$ //$NON-NLS-2$
     public int getSampleSize() {
@@ -701,6 +547,36 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
 
     public void setTypeNameList(String typeNameList) {
         this.typeNameList = typeNameList;
+    }
+    
+    public static class Dimension implements Comparable<Dimension> {
+        
+        private final String name;
+        int dimension;
+        
+        public Dimension() {
+            this.name = DIM_SUFFIX ;
+            this.dimension = 0;
+        }
+        
+        public void increment() {
+            dimension++;
+        }
+        
+        public String get(){
+            return this.name + this.dimension;
+        }
+        
+        @Override
+        public int compareTo(Dimension dim) {
+            if(this.dimension < dim.dimension) {
+                return -1;
+            } else if(this.dimension > dim.dimension) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
     }
    
 }

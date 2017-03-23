@@ -29,8 +29,8 @@ import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTDOCUMENT
 import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTMETADATADOCUMENT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.SAVEDOCUMENT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DELETEDOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.ID;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.RESULT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.ID;
+import static org.teiid.translator.couchbase.CouchbaseProperties.RESULT;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

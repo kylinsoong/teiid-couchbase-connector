@@ -31,10 +31,14 @@ public interface CouchbaseProperties {
     String PK = "PK"; //$NON-NLS-1$
     String UNDERSCORE = "_"; //$NON-NLS-1$
     String IDX_SUFFIX = "_idx"; //$NON-NLS-1$
-    String DIM_SUFFIX = "_dim"; //$NON-NLS-1$
+    String DIM_SUFFIX = "dim"; //$NON-NLS-1$
+    String SQUARE_BRACKETS = "[]"; //$NON-NLS-1$
     
     String TRUE_VALUE = "true"; //$NON-NLS-1$
     String FALSE_VALUE = "false"; //$NON-NLS-1$
+    
+    String ID = "id"; //$NON-NLS-1$
+    String RESULT = "result"; //$NON-NLS-1$
     
     String DEFAULT_NAMESPACE = "default"; //$NON-NLS-1$
     String DEFAULT_TYPENAME = "type"; //$NON-NLS-1$

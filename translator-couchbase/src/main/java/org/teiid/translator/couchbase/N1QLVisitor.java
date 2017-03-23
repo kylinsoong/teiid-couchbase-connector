@@ -34,15 +34,14 @@ import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTDOCUMENT
 import static org.teiid.translator.couchbase.CouchbaseProperties.GETTEXTMETADATADOCUMENT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.SAVEDOCUMENT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DELETEDOCUMENT;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.ID;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.RESULT;
+import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.ID;
+import static org.teiid.translator.couchbase.CouchbaseProperties.RESULT;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_ARRAY_TABLE;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_TOP_TABLE;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.ARRAY_TABLE_GROUP;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.TRUE;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.FALSE;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.DOCUMENT_ID;
-import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.buildNameInSource;
+import static org.teiid.translator.couchbase.CouchbaseProperties.TRUE_VALUE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.FALSE_VALUE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENTID;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -122,9 +121,10 @@ public class N1QLVisitor extends SQLStringVisitor{
         if(groupTable != null) {
             String group = obj.getTable().getCorrelationName();
             String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false);
-            String isTopTable = obj.getTable().getMetadataObject().getProperty(IS_TOP_TABLE, false);
+            //TODO--
+            String isTopTable = obj.getTable().getMetadataObject().getProperty("", false);
             
-            if(obj.getName().equals(DOCUMENT_ID)) {
+            if(obj.getName().equals(DOCUMENTID)) {
                 if(recordColumnName) {
                     buffer.append("META().id AS PK"); //$NON-NLS-1$ 
                     selectColumns.add("PK"); //$NON-NLS-1$ 
@@ -134,18 +134,18 @@ public class N1QLVisitor extends SQLStringVisitor{
                 return;
             }
             
-            if(isArrayTable.equals(TRUE) && !isNestedArrayColumns){
+            if(isArrayTable.equals(TRUE_VALUE) && !isNestedArrayColumns){
                 if(group == null) {
                     group = obj.getTable().getMetadataObject().getProperty(ARRAY_TABLE_GROUP, false);
                 }
                 buffer.append(group);
                 selectColumns.add(group);
                 isNestedArrayColumns = true;
-            } else if(isArrayTable.equals(FALSE) && isTopTable.equals(FALSE) && group == null) {
+            } else if(isArrayTable.equals(FALSE_VALUE) && isTopTable.equals(FALSE_VALUE) && group == null) {
                 shortNameOnly = true;
                 super.visit(obj);
                 shortNameOnly = false;
-            } else if(isArrayTable.equals(FALSE)){
+            } else if(isArrayTable.equals(FALSE_VALUE)){
                 super.visit(obj);
             }
             
@@ -247,7 +247,7 @@ public class N1QLVisitor extends SQLStringVisitor{
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(SAVEDOCUMENT)) {
             buffer.append("UPSERT INTO").append(Tokens.SPACE); //$NON-NLS-1$
-            buffer.append(buildNameInSource(keySpace, null)).append(Tokens.SPACE);
+            buffer.append(nameInSource(keySpace)).append(Tokens.SPACE);
             buffer.append(Reserved.AS).append(Tokens.SPACE);
             buffer.append(RESULT).append(Tokens.SPACE); 
             buffer.append("(KEY, VALUE) VALUES").append(Tokens.SPACE); //$NON-NLS-1$
@@ -262,14 +262,12 @@ public class N1QLVisitor extends SQLStringVisitor{
                     append(param);
                 }
             }
-            buffer.append(Tokens.RPAREN).append(Tokens.SPACE);
-            buffer.append("RETURNING").append(Tokens.SPACE); //$NON-NLS-1$
-            buffer.append(RESULT);
+            buffer.append(Tokens.RPAREN);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(DELETEDOCUMENT)) {
             buffer.append(Reserved.DELETE).append(Tokens.SPACE);
             buffer.append(Reserved.FROM).append(Tokens.SPACE);
-            buffer.append(buildNameInSource(keySpace, null)).append(Tokens.SPACE);
+            buffer.append(nameInSource(keySpace)).append(Tokens.SPACE);
             buffer.append(Reserved.AS).append(Tokens.SPACE);
             buffer.append(RESULT).append(Tokens.SPACE); 
             appendN1QLPK(call);
@@ -283,7 +281,7 @@ public class N1QLVisitor extends SQLStringVisitor{
             buffer.append(Reserved.AS).append(Tokens.SPACE);
             buffer.append(RESULT).append(Tokens.SPACE);
             buffer.append(Reserved.FROM).append(Tokens.SPACE);
-            buffer.append(buildNameInSource(keySpace, null));
+            buffer.append(nameInSource(keySpace));
             return;
         } 
     }
@@ -296,7 +294,7 @@ public class N1QLVisitor extends SQLStringVisitor{
         buffer.append(Tokens.COMMA).append(Tokens.SPACE); 
         buffer.append(RESULT).append(Tokens.SPACE); 
         buffer.append(Reserved.FROM).append(Tokens.SPACE);
-        buffer.append(buildNameInSource(keySpace, null)).append(Tokens.SPACE);
+        buffer.append(nameInSource(keySpace)).append(Tokens.SPACE);
         buffer.append(Reserved.AS).append(Tokens.SPACE).append(RESULT).append(Tokens.SPACE);
     }
     
@@ -304,7 +302,7 @@ public class N1QLVisitor extends SQLStringVisitor{
         buffer.append(SELECT).append(Tokens.SPACE);
         buffer.append(RESULT).append(Tokens.SPACE); 
         buffer.append(Reserved.FROM).append(Tokens.SPACE);
-        buffer.append(buildNameInSource(keySpace, null)).append(Tokens.SPACE);
+        buffer.append(nameInSource(keySpace)).append(Tokens.SPACE);
         buffer.append(Reserved.AS).append(Tokens.SPACE).append(RESULT).append(Tokens.SPACE);
     }
     
@@ -319,5 +317,9 @@ public class N1QLVisitor extends SQLStringVisitor{
     private void appendN1QLPK(Call call) {
         buffer.append("USE PRIMARY KEYS").append(Tokens.SPACE);
         append(call.getArguments().get(0));
+    }
+    
+    private String nameInSource(String path) {
+        return WAVE + path + WAVE; 
     }
 }
