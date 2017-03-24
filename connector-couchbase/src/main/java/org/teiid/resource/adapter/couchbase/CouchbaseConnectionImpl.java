@@ -43,7 +43,6 @@ public class CouchbaseConnectionImpl extends BasicConnection implements Couchbas
 
 	private Cluster cluster;
 	private Bucket bucket;
-	private String keyspace;
 	
 	private String namespace; // map to namespaces
 	
@@ -55,14 +54,8 @@ public class CouchbaseConnectionImpl extends BasicConnection implements Couchbas
         } else {
             this.bucket = this.cluster.openBucket(keyspace, environment.connectTimeout(), timeUnit);
         }
-        this.keyspace = keyspace;
 	    this.namespace = namespace;
 	}
-
-    @Override
-    public String getKeyspaceName() {
-        return this.keyspace;
-    }
 
     @Override
     public N1qlQueryResult executeQuery(String query) {

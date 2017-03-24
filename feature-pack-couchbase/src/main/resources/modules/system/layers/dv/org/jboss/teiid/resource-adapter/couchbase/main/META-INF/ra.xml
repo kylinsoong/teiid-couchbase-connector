@@ -47,6 +47,12 @@
                <config-property-name>Keyspace</config-property-name>
                <config-property-type>java.lang.String</config-property-type>
             </config-property>
+
+            <config-property>
+               <description>{$display:"Namespace", $description:"Couchbase Server Namespace Name", $required:"true"}</description>
+               <config-property-name>Namespace</config-property-name>
+               <config-property-type>java.lang.String</config-property-type>
+            </config-property>
             
             <config-property>
                <description>{$display:"Password",$description:"Couchbase Server Keyspace/Bucket Password",$masked:"true"}</description> 

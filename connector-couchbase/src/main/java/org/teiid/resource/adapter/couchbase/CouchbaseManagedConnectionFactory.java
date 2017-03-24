@@ -200,6 +200,10 @@ public class CouchbaseManagedConnectionFactory extends BasicManagedConnectionFac
             throw new InvalidPropertyException(UTIL.getString("no_keyspace")); //$NON-NLS-1$
         }
 		
+		if (this.namespace == null) {
+            throw new InvalidPropertyException(UTIL.getString("no_namespace")); //$NON-NLS-1$
+        }
+		
 		TimeUnit unit = TimeUnit.MILLISECONDS;
 		if(this.timeUnit != null) {
 		    try {
