@@ -1,0 +1,24 @@
+SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbase;
+
+CREATE FOREIGN TABLE Customer (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	ID string OPTIONS (NAMEINSOURCE '`ID`'),
+	type string OPTIONS (NAMEINSOURCE '`type`'),
+	Name string OPTIONS (NAMEINSOURCE '`Name`'),
+	CONSTRAINT PK0 PRIMARY KEY("_documentId")
+) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+
+CREATE FOREIGN TABLE SavedAddresses (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	SavedAddresses_idx integer OPTIONS (UPDATABLE FALSE),
+	SavedAddresses string OPTIONS (NAMEINSOURCE '`SavedAddresses`[]'),
+	FOREIGN KEY("_documentId") REFERENCES Customer 
+) OPTIONS (NAMEINSOURCE '`SavedAddresses`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
+
+CREATE FOREIGN TABLE test2_Customer (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	ID string OPTIONS (NAMEINSOURCE '`ID`'),
+	type string OPTIONS (NAMEINSOURCE '`type`'),
+	Name string OPTIONS (NAMEINSOURCE '`Name`'),
+	CONSTRAINT PK0 PRIMARY KEY("_documentId")
+) OPTIONS (NAMEINSOURCE '`test2`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');

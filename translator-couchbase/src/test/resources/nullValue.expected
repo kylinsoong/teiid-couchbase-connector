@@ -1,0 +1,16 @@
+SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbase;
+
+CREATE FOREIGN TABLE attr_array (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	attr_array_idx integer OPTIONS (UPDATABLE FALSE),
+	attr_array string OPTIONS (NAMEINSOURCE '`attr_array`[]'),
+	FOREIGN KEY("_documentId") REFERENCES test 
+) OPTIONS (NAMEINSOURCE '`attr_array`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
+
+CREATE FOREIGN TABLE test (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	attr_obj_attr_null string OPTIONS (NAMEINSOURCE '`attr_obj`.`attr_null`'),
+	attr_null string OPTIONS (NAMEINSOURCE '`attr_null`'),
+	Name string OPTIONS (NAMEINSOURCE '`Name`'),
+	CONSTRAINT PK0 PRIMARY KEY("_documentId")
+) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');

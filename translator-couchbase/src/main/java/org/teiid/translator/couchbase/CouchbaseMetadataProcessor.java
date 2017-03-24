@@ -58,6 +58,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.teiid.core.types.DataTypeManager;
 import org.teiid.couchbase.CouchbaseConnection;
 import org.teiid.logging.LogConstants;
 import org.teiid.logging.LogManager;
@@ -205,7 +206,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             while(result.hasNext()) {
                 JsonObject row = result.next().value(); // result.next() always can not be null
                 JsonObject currentRowJson = row.getObject(keyspace);
-                scanRow(keyspace, currentRowJson, mf, table, tableName, false, new Dimension());
+                scanRow(keyspace, nameInSource(keyspace), currentRowJson, mf, table, table.getName(), false, new Dimension());
             }            
         }
     }
@@ -214,8 +215,8 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
      * A dispatcher of scan jsonValue(document, of a segment of document), the jsonValue either can be a JsonObject, or JsonArray, 
      * different type dispatch to different scan method.
      * 
-     * @param keyspace - Couchbase keyspace, or typed table name.
-     * @param jsonValue - JsonObject/JsonArray which may contain nested JsonObject/JsonArray
+     * @param key - The attribute name in document, which mapped with value
+     * @param value - JsonObject/JsonArray which may contain nested JsonObject/JsonArray
      * @param mf
      * @param conn
      * @param table
@@ -224,47 +225,57 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
      * @param dimension - The dimension of nested array, for example, "{"nestedArray": [[["nestedArray"]]]}", the dimension
      *                    deepest array is 3
      */
-    protected void scanRow(String keyspace, JsonValue jsonValue, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
+    protected void scanRow(String key, String keyInSource, JsonValue value, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
         
-        LogManager.logTrace(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29013, table, keyspace, jsonValue));
+//        LogManager.logTrace(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29013, table, key, value));
+        LogManager.logError("Developing", CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29013, table, key, value));// TODO-- need remove
         
-        if(isObjectJsonType(jsonValue)) {
-            scanObjectRow(keyspace, (JsonObject)jsonValue, mf, table, referenceTableName, isNestedType, dimension);
-        } else if (isArrayJsonType(jsonValue)) {
-            scanArrayRow(keyspace, (JsonArray)jsonValue, mf, table, referenceTableName, isNestedType, dimension);
+        if(isObjectJsonType(value)) {
+            scanObjectRow(key, keyInSource, (JsonObject)value, mf, table, referenceTableName, isNestedType, dimension);
+        } else if (isArrayJsonType(value)) {
+            scanArrayRow(key, keyInSource, (JsonArray)value, mf, table, referenceTableName, isNestedType, dimension);
         }
     }
 
-    private void scanObjectRow(String keyspace, JsonObject json, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
+    private void scanObjectRow(String key, String keyInSource, JsonObject value, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
         
-        Set<String> names = json.getNames();
+        Set<String> names = value.getNames();
         
         for(String name : names) {
             String columnName = name;
-            Object columnValue = json.get(columnName);
+            Object columnValue = value.get(columnName);
             String columnType = getDataType(columnValue);
 
             if(columnType.equals(OBJECT)) {
                 JsonValue jsonValue = (JsonValue) columnValue;
-                if(isObjectJsonType(columnValue)) {
-                    scanRow(keyspace, jsonValue, mf, table, referenceTableName, true, dimension);
+                String newKey = columnName;
+                String newKeyInSource = this.nameInSource(columnName);
+                
+                if(isNestedType) {
+                    newKey = key + UNDERSCORE + columnName;
+                    newKeyInSource = keyInSource + SOURCE_SEPARATOR + newKeyInSource;
+                }
+                
+                if(isObjectJsonType(columnValue)) {  
+                    scanRow(newKey, newKeyInSource, jsonValue, mf, table, referenceTableName, true, dimension);
                 } else if(isArrayJsonType(columnValue)) {
-                    String tableName = table.getName() + UNDERSCORE + columnName;
-                    String tableNameInSource = table.getNameInSource() + SOURCE_SEPARATOR + nameInSource(columnName) + SQUARE_BRACKETS ;
+                    String tableName = newKey;
+                    String tableNameInSource = newKeyInSource + SQUARE_BRACKETS ;
                     Table subTable = addTable(tableName, tableNameInSource, true, referenceTableName, dimension, mf);
-                    scanRow(keyspace, jsonValue, mf, subTable, referenceTableName, true, dimension);
+                    scanRow(newKey, newKeyInSource, jsonValue, mf, subTable, referenceTableName, true, dimension);
                 }
             } else {
                 String columnNameInSource = nameInSource(name);
                 if(isNestedType) {
-                    columnName = table.getName() + UNDERSCORE + columnName;
+                    columnName = key + UNDERSCORE + columnName;
+                    columnNameInSource = keyInSource + SOURCE_SEPARATOR + columnNameInSource;
                 }
                 addColumn(columnName, columnType, columnValue, true, columnNameInSource, table, mf);
             }
         } 
     }
 
-    private void scanArrayRow(String keyspace, JsonArray array, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
+    private void scanArrayRow(String keyspace, String keyInSource, JsonArray array, MetadataFactory mf, Table table, String referenceTableName, boolean isNestedType, Dimension dimension) {
         
         if(array.size() > 0) {
             for(int i = 0 ; i < array.size() ; i ++) {
@@ -278,12 +289,12 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
                         if(columnType.equals(OBJECT)) {
                             JsonValue jsonValue = (JsonValue) columnValue;
                             if(isObjectJsonType(jsonValue)) {
-                                scanRow(keyspace, jsonValue, mf, table, referenceTableName, true, dimension);
+                                scanRow(keyspace, keyInSource, jsonValue, mf, table, referenceTableName, true, dimension);
                             } else if (isArrayJsonType(jsonValue)) {
                                 String tableName = table.getName() + UNDERSCORE + name + UNDERSCORE + dimension.get();
                                 String tableNameInSrc = table.getNameInSource() + SOURCE_SEPARATOR + this.nameInSource(name) + SQUARE_BRACKETS;
                                 Table subTable = addTable(tableName, tableNameInSrc, true, referenceTableName, dimension, mf);
-                                scanRow(keyspace, jsonValue, mf, subTable, referenceTableName, true, dimension);
+                                scanRow(keyspace, keyInSource, jsonValue, mf, subTable, referenceTableName, true, dimension);
                             }
                         } else {
                             String columnName = table.getName() + UNDERSCORE + name;
@@ -295,11 +306,12 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
                     String tableName = table.getName() + UNDERSCORE + dimension.get();
                     String tableNameInSrc = table.getNameInSource() + SQUARE_BRACKETS;
                     Table subTable = addTable(tableName, tableNameInSrc, true, referenceTableName, dimension, mf);
-                    scanRow(keyspace, (JsonValue)element, mf, subTable, referenceTableName, true, dimension);
+                    scanRow(keyspace, keyInSource, (JsonValue)element, mf, subTable, referenceTableName, true, dimension);
                 } else {
                     String elementType = getDataType(element);
                     String columnName = table.getName();
-                    addColumn(columnName, elementType, element, true, null, table, mf);
+                    String columnNameInSource = table.getNameInSource();
+                    addColumn(columnName, elementType, element, true, columnNameInSource, table, mf);
                 }
             }
         } else {
@@ -345,6 +357,10 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             columnType = TypeFacility.RUNTIME_NAMES.STRING;
         } else if (columnType == null && columnValue == null && table.getColumnByName(columnName) != null) {
             columnType = table.getColumnByName(columnName).getDatatype().getName();
+        }
+        
+        if(DataTypeManager.DefaultDataTypes.NULL.equals(columnType)) {
+            columnType = DataTypeManager.DefaultDataTypes.STRING; // how to handle null type?
         }
         
         if (table.getColumnByName(columnName) == null) {

@@ -25,10 +25,13 @@ import static org.junit.Assert.*;
 import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.STRING;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENTID;
 import static org.teiid.translator.couchbase.CouchbaseProperties.FALSE_VALUE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.UNDERSCORE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_ARRAY_TABLE;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -44,9 +47,7 @@ import javax.resource.ResourceException;
 
 import org.junit.Ignore;
 import org.junit.Test;
-import org.mockito.Mockito;
 import org.teiid.core.util.UnitTestUtil;
-import org.teiid.couchbase.CouchbaseConnection;
 import org.teiid.metadata.MetadataFactory;
 import org.teiid.metadata.Table;
 import org.teiid.query.metadata.DDLStringVisitor;
@@ -55,19 +56,21 @@ import org.teiid.translator.couchbase.CouchbaseMetadataProcessor.Dimension;
 
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
+import com.couchbase.client.java.document.json.JsonValue;
 
-@SuppressWarnings({"nls", "static-access"})
+@SuppressWarnings({"nls",})
 public class TestCouchbaseMetadataProcessor {
     
     static final String KEYSPACE = "test";
+    static final String KEYSPACE_SOURCE = "`test`";
     
     @Test
     public void testCustomerOrder() throws ResourceException {
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE);
-        mp.scanRow(KEYSPACE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
-        mp.scanRow(KEYSPACE, formOder(), mf, table, KEYSPACE, false, new Dimension());
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("customerOrder.expected", mf);
     }
     
@@ -75,91 +78,105 @@ public class TestCouchbaseMetadataProcessor {
     public void testCustomerOrderMultiple() throws ResourceException {
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE);
-        mp.scanRow(KEYSPACE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
-        mp.scanRow(KEYSPACE, formOder(), mf, table, KEYSPACE, false, new Dimension());
-        mp.scanRow(KEYSPACE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
-        mp.scanRow(KEYSPACE, formOder(), mf, table, KEYSPACE, false, new Dimension());
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("customerOrder.expected", mf);
     }
     
     @Test
-    public void testMetadataLayerJson() throws ResourceException {
+    public void testCustomerOrderWithTypedName() throws ResourceException {
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
+        mp.setTypeNameList("`test`:`type`,`beer-sample`:`type`,` travel-sample`:`type`");
+        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
+        Table customer = this.createTable(mf, KEYSPACE, "Customer");
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, customer, customer.getName(), false, new Dimension());
+        Table order = this.createTable(mf, KEYSPACE, "Oder");
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, order, order.getName(), false, new Dimension());
+        helpTest("customerOrderTypedName.expected", mf);
+    }
+    
+    @Test
+    public void testCustomerWithDuplicatedTypedName() throws ResourceException {
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
+        mp.setTypeNameList("`test`:`type`,`test2`:`type`");
+        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
+        String typedName = "Customer";
+        String keyspace1 = "test";
+        String keyspace2 = "test2";
+        Table table1 = createTable(mf, keyspace1, typedName);
+        mp.scanRow("test", KEYSPACE_SOURCE, formCustomer(), mf, table1, table1.getName(), false, new Dimension());
+        Table table2 = createTable(mf, keyspace2, typedName);
+        mp.scanRow("test2", "`test2`", formCustomer(), mf, table2, table2.getName(), false, new Dimension());
+        helpTest("customerDuplicatedTypedName.expected", mf);
+    }
+    
+    @Test
+    public void testNullValue() throws ResourceException {
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
+        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formNullValueJson(), mf, table, KEYSPACE, false, new Dimension());
+        helpTest("nullValue.expected", mf);
+    }
+    
+
+    @Test
+    public void testDataType() throws ResourceException {
         
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
-        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-//        metadataProcessor.addTable(conn, mf, KEYSPACE, KEYSPACE, layerJson());
-        helpTest("layerJson.expected", mf);
-    }
-    
-    @Test
-    public void testMetadataLayerArray() throws ResourceException {
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
-        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-//        metadataProcessor.addTable(conn, mf,  KEYSPACE, layerArray(), null);
-        helpTest("layerArray.expected", mf);
-    }
-    
-    @Test
-    public void testMetadataComplexArray() throws ResourceException {
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
-        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-//        metadataProcessor.addTable(conn, mf,  KEYSPACE, formArray(), null);
-        helpTest("complexArray.expected", mf);
-    }
-    
-    @Test
-    public void testMetadataDataTypeSimpleJson() throws ResourceException {
+        /* 10 potential types: String, Integer, Long, Double, Boolean, BigInteger, BigDecimal, JsonObject, JsonArray, null */
         
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-//        metadataProcessor.addTable(conn, mf, KEYSPACE, formSimpleJson(), null);
-        helpTest("simpleJson.expected", mf);
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formDataTypeJson(), mf, table, KEYSPACE, false, new Dimension());
+        helpTest("dataTypeJson.expected", mf);
     }
     
     @Test
-    public void testMetadataDataTypeCompleteJson() throws ResourceException {
+    public void testNestedJson() throws ResourceException {
         
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-//        metadataProcessor.addTable(conn, mf, KEYSPACE, formJson(), null);
-        helpTest("completeJson.expected", mf);
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, nestedJson(), mf, table, KEYSPACE, false, new Dimension());
+        helpTest("nestedJson.expected", mf);
     }
     
     @Test
     public void testNestedArray() throws ResourceException {
         
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-//        metadataProcessor.addTable(conn, mf, KEYSPACE, nestedArray(), null);
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, nestedArray(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("nestedArray.expected", mf);
+    }
+
+    @Test
+    public void testComplexJson() throws ResourceException {
+        
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
+        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, complexJson(), mf, table, KEYSPACE, false, new Dimension());
+        helpTest("complexJson.expected", mf);
     }
 
     @Ignore("not resolved so far")
     @Test
     public void testMetadataCaseSensitive() throws ResourceException {
         
-        CouchbaseMetadataProcessor metadataProcessor = new CouchbaseMetadataProcessor();  
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-        Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
         JsonObject json = JsonObject.create()
                 .put("name", "value")
                 .put("Name", "value")
                 .put("nAmE", "value");
-//        metadataProcessor.addTable(conn, mf, KEYSPACE, json, null);
+        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, json, mf, table, KEYSPACE, false, new Dimension());
         helpTest("TODO.expected", mf);
     }
     
@@ -172,8 +189,11 @@ public class TestCouchbaseMetadataProcessor {
         helpTest("procedures.expected", mf);
     }
     
-    private Table createTable(MetadataFactory mf, String keyspace) {
-        Table table = mf.addTable(keyspace);
+    private Table createTable(MetadataFactory mf, String keyspace, String tableName) {
+        if (mf.getSchema().getTable(tableName) != null && !tableName.equals(keyspace)) { 
+            tableName = keyspace + UNDERSCORE + tableName;
+        }
+        Table table = mf.addTable(tableName);
         table.setNameInSource(WAVE + keyspace + WAVE);
         table.setSupportsUpdate(true);
         table.setProperty(IS_ARRAY_TABLE, FALSE_VALUE);
@@ -198,66 +218,85 @@ public class TestCouchbaseMetadataProcessor {
                 .put("CreditCard", JsonObject.create().put("Type", "Visa").put("CardNumber", "4111 1111 1111 111").put("Expiry", "12/12").put("CVN", 123))
                 .put("Items", JsonArray.from(JsonObject.create().put("ItemID", 89123).put("Quantity", 1), JsonObject.create().put("ItemID", 92312).put("Quantity", 5)));
     }
-
-    static JsonObject formSimpleJson() {
+    
+    static JsonValue formNullValueJson() {
         return JsonObject.create()
-                .put("Name", "Simple Json")
-                .put("attr_boolean", true)
-                .put("attr_double", 0.0d)
-                .put("attr_int", 1)
-                .put("attr_long", 10000L)
-                .put("attr_number_byte", new Byte((byte)1))
-                .put("attr_number_short", new Short((short) 20))
-                .put("attr_number_integer", new Integer(1))
-                .put("attr_number_long", new Long(10000L))
-                .put("attr_number_float", new Float(50.123))
-                .put("attr_number_double", new Double(60.123))
+                .put("Name", "null value test")
+                .putNull("attr_null")
+                .put("attr_obj", JsonObject.create().putNull("attr_null"))
+                .put("attr_array", JsonArray.create().addNull());
+    }
+
+    static JsonObject formDataTypeJson() {
+        return JsonObject.create()
+                .put("Name", "data type test")
                 .put("attr_string", "This is String value")
+                .put("attr_integer", Integer.MAX_VALUE)
+                .put("attr_long", Long.MAX_VALUE)
+                .put("attr_double", Double.MAX_VALUE)
+                .put("attr_boolean", Boolean.TRUE)
+                .put("attr_bigInteger", new BigInteger("fffffffffffff", 16))
+                .put("attr_bigDecimal", new BigDecimal("1115.37"))
+                .put("attr_jsonObject", JsonObject.create().put("key", "value"))
+                .put("attr_jsonArray", formDataTypeArray())
                 .putNull("attr_null");
     }
     
-    static JsonObject formJson() {
-        return formSimpleJson().put("Name", "Complex Json").put("attr_jsonObject", formSimpleJson()).put("attr_jsonArray", formSimpleJsonArray());
-    }
-    
-    static JsonObject formArray() {
-        return JsonObject.create().put("Name", "Complex Array").put("attr_jsonArray", JsonArray.create().add(true).add(1000).add("String Value").add(formJson()));
-    }
-    
-    static JsonObject layerJson() {
-        return JsonObject.create().put("Name", "Layer Json").put("nestedJson", JsonObject.create().put("nestedJson", JsonObject.create().put("nestedJson", "value")));
-    }
-    
-    static JsonObject layerArray() {
-        return JsonObject.create().put("Name", "Layer Array").put("nestedArray", JsonArray.create().from(JsonArray.create().from(JsonArray.create().add("nestedArray"))));
-    }
-    
-    static JsonArray formSimpleJsonArray() {
+    static JsonArray formDataTypeArray() {
         return JsonArray.create()
-                .add(true)
-                .add(0.0d)
-                .add(1)
-                .add(10000L)
-                .add(new Byte((byte)1))
-                .add(new Short((short) 20))
-                .add(new Integer(1))
-                .add(new Long(10000L))
-                .add(new Float(50.123))
-                .add(new Double(60.123))
                 .add("This is String value")
+                .add(Integer.MAX_VALUE)
+                .add(Long.MAX_VALUE)
+                .add(Double.MAX_VALUE)
+                .add(Boolean.TRUE)
+                .add(new BigInteger("fffffffffffff", 16))
+                .add(new BigDecimal("1115.37"))
+                .add(JsonObject.create().put("key", "value"))
+                .add(JsonArray.create().add("array"))
                 .addNull();
+                
+    }
+    
+    
+    static JsonObject nestedJson() {
+        return JsonObject.create()
+                .put("Name", "Nested Json")
+                .put("nestedJson", JsonObject.create()
+                        .put("Dimension", 1)
+                        .put("nestedJson", JsonObject.create()
+                                .put("Dimension", 2)
+                                .put("nestedJson", JsonObject.create()
+                                        .put("Dimension", 3)
+                                        .put("nestedJson", "value"))));
     }
     
     static JsonObject nestedArray() {
-        return JsonObject.create().put("Name", "Nested Array").put("LoopNestedArray", JsonArray.create()
-                .add("item")
-                .add(JsonObject.create().put("key1", "value1"))
-                .add(JsonObject.create().put("key2", "value2"))
-                .add(JsonObject.create().put("key3", "value3").put("key4", "value4"))
-                .add(JsonObject.create().put("key5", JsonObject.create().put("key6", "value6")).put("key7", JsonArray.create().add(100).add(200)))
-                .add(JsonArray.create().add(true).add(false)));
+        return JsonObject.create()
+                .put("Name", "Nested Array")
+                .put("nestedArray", JsonArray.create()
+                        .add("dimension 1")
+                        .add(JsonArray.create()
+                                .add("dimension 2")
+                                .add(JsonArray.create()
+                                        .add("dimension 3")
+                                        .add(JsonArray.create()
+                                                .add("dimension 4")))));
     }
     
+    static JsonObject complexJson() {
+        return JsonObject.create()
+                .put("Name", "Complex Json")
+                .put("attr_jsonObject", JsonObject.create()
+                        .put("Name", "Nested Json")
+                        .put("attr_jsonArray", JsonArray.create()
+                                .add("Nested array")
+                                .add(JsonObject.create().put("Name", "Nested Json"))))
+                .put("attr_jsonArray", JsonArray.create()
+                        .add("Nested array")
+                        .add(JsonObject.create().put("Name", "Nested Json"))
+                        .add(JsonObject.create().put("Name", "Nested Json").put("Dimension", 1)));
+    }
+
     private static final boolean PRINT_TO_CONSOLE = true;
     private static final boolean REPLACE_EXPECTED = false;
     
