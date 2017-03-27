@@ -68,7 +68,7 @@ public class TestCouchbaseMetadataProcessor {
     public void testCustomerOrder() throws ResourceException {
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("customerOrder.expected", mf);
@@ -78,7 +78,7 @@ public class TestCouchbaseMetadataProcessor {
     public void testCustomerOrderMultiple() throws ResourceException {
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, table, KEYSPACE, false, new Dimension());
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, table, KEYSPACE, false, new Dimension());
@@ -91,9 +91,9 @@ public class TestCouchbaseMetadataProcessor {
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         mp.setTypeNameList("`test`:`type`,`beer-sample`:`type`,` travel-sample`:`type`");
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table customer = this.createTable(mf, KEYSPACE, "Customer");
+        Table customer = createTable(mf, KEYSPACE, "Customer");
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, customer, customer.getName(), false, new Dimension());
-        Table order = this.createTable(mf, KEYSPACE, "Oder");
+        Table order = createTable(mf, KEYSPACE, "Oder");
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, order, order.getName(), false, new Dimension());
         helpTest("customerOrderTypedName.expected", mf);
     }
@@ -117,7 +117,7 @@ public class TestCouchbaseMetadataProcessor {
     public void testNullValue() throws ResourceException {
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formNullValueJson(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("nullValue.expected", mf);
     }
@@ -130,7 +130,7 @@ public class TestCouchbaseMetadataProcessor {
         
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formDataTypeJson(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("dataTypeJson.expected", mf);
     }
@@ -140,7 +140,7 @@ public class TestCouchbaseMetadataProcessor {
         
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, nestedJson(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("nestedJson.expected", mf);
     }
@@ -150,7 +150,7 @@ public class TestCouchbaseMetadataProcessor {
         
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, nestedArray(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("nestedArray.expected", mf);
     }
@@ -160,9 +160,19 @@ public class TestCouchbaseMetadataProcessor {
         
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
         MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, complexJson(), mf, table, KEYSPACE, false, new Dimension());
         helpTest("complexJson.expected", mf);
+    }
+    
+    @Test
+    public void testJsonNestedArray() throws ResourceException {
+        
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
+        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, complexJsonNestedArray(), mf, table, KEYSPACE, false, new Dimension());
+        helpTest("complexJsonNestedArray.expected", mf);
     }
 
     @Ignore("not resolved so far")
@@ -175,7 +185,7 @@ public class TestCouchbaseMetadataProcessor {
                 .put("name", "value")
                 .put("Name", "value")
                 .put("nAmE", "value");
-        Table table = this.createTable(mf, KEYSPACE, KEYSPACE);
+        Table table = createTable(mf, KEYSPACE, KEYSPACE);
         mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, json, mf, table, KEYSPACE, false, new Dimension());
         helpTest("TODO.expected", mf);
     }
@@ -189,7 +199,7 @@ public class TestCouchbaseMetadataProcessor {
         helpTest("procedures.expected", mf);
     }
     
-    private Table createTable(MetadataFactory mf, String keyspace, String tableName) {
+    static Table createTable(MetadataFactory mf, String keyspace, String tableName) {
         if (mf.getSchema().getTable(tableName) != null && !tableName.equals(keyspace)) { 
             tableName = keyspace + UNDERSCORE + tableName;
         }
@@ -295,6 +305,16 @@ public class TestCouchbaseMetadataProcessor {
                         .add("Nested array")
                         .add(JsonObject.create().put("Name", "Nested Json"))
                         .add(JsonObject.create().put("Name", "Nested Json").put("Dimension", 1)));
+    }
+    
+    static JsonValue complexJsonNestedArray() {
+        return JsonObject.create()
+                .put("Name", "Complex Json")
+                .put("attr_jsonObject", JsonObject.create()
+                        .put("Name", "Nested Json")
+                        .put("attr_jsonArray", JsonArray.create()
+                                .add("Nested array")
+                                .add(JsonObject.create().put("Name", "Nested Json"))));
     }
 
     private static final boolean PRINT_TO_CONSOLE = true;

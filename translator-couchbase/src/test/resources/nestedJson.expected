@@ -2,10 +2,10 @@ SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbas
 
 CREATE FOREIGN TABLE test (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
-	nestedJson_nestedJson_nestedJson_nestedJson string OPTIONS (NAMEINSOURCE '`nestedJson`.`nestedJson`.`nestedJson`.`nestedJson`'),
-	nestedJson_nestedJson_nestedJson_Dimension integer OPTIONS (NAMEINSOURCE '`nestedJson`.`nestedJson`.`nestedJson`.`Dimension`'),
-	nestedJson_nestedJson_Dimension integer OPTIONS (NAMEINSOURCE '`nestedJson`.`nestedJson`.`Dimension`'),
-	nestedJson_Dimension integer OPTIONS (NAMEINSOURCE '`nestedJson`.`Dimension`'),
+	test_nestedJson_nestedJson_nestedJson_nestedJson string OPTIONS (NAMEINSOURCE '`test`.`nestedJson`.`nestedJson`.`nestedJson`.`nestedJson`'),
+	test_nestedJson_nestedJson_nestedJson_Dimension integer OPTIONS (NAMEINSOURCE '`test`.`nestedJson`.`nestedJson`.`nestedJson`.`Dimension`'),
+	test_nestedJson_nestedJson_Dimension integer OPTIONS (NAMEINSOURCE '`test`.`nestedJson`.`nestedJson`.`Dimension`'),
+	test_nestedJson_Dimension integer OPTIONS (NAMEINSOURCE '`test`.`nestedJson`.`Dimension`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');

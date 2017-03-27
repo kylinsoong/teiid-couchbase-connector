@@ -1,29 +1,29 @@
 SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbase;
 
-CREATE FOREIGN TABLE Items (
-	"_documentId" string OPTIONS (UPDATABLE FALSE),
-	Items_idx integer OPTIONS (UPDATABLE FALSE),
-	Items_Quantity integer OPTIONS (NAMEINSOURCE '`Quantity`'),
-	Items_ItemID integer OPTIONS (NAMEINSOURCE '`ItemID`'),
-	FOREIGN KEY("_documentId") REFERENCES test 
-) OPTIONS (NAMEINSOURCE '`Items`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
-
-CREATE FOREIGN TABLE SavedAddresses (
-	"_documentId" string OPTIONS (UPDATABLE FALSE),
-	SavedAddresses_idx integer OPTIONS (UPDATABLE FALSE),
-	SavedAddresses string OPTIONS (NAMEINSOURCE '`SavedAddresses`[]'),
-	FOREIGN KEY("_documentId") REFERENCES test 
-) OPTIONS (NAMEINSOURCE '`SavedAddresses`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
-
 CREATE FOREIGN TABLE test (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
 	ID string OPTIONS (NAMEINSOURCE '`ID`'),
 	type string OPTIONS (NAMEINSOURCE '`type`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CustomerID string OPTIONS (NAMEINSOURCE '`CustomerID`'),
-	CreditCard_CardNumber string OPTIONS (NAMEINSOURCE '`CreditCard`.`CardNumber`'),
-	CreditCard_Type string OPTIONS (NAMEINSOURCE '`CreditCard`.`Type`'),
-	CreditCard_CVN integer OPTIONS (NAMEINSOURCE '`CreditCard`.`CVN`'),
-	CreditCard_Expiry string OPTIONS (NAMEINSOURCE '`CreditCard`.`Expiry`'),
+	test_CreditCard_CardNumber string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`CardNumber`'),
+	test_CreditCard_Type string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`Type`'),
+	test_CreditCard_CVN integer OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`CVN`'),
+	test_CreditCard_Expiry string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`Expiry`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+
+CREATE FOREIGN TABLE test_Items (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	test_Items_idx integer OPTIONS (UPDATABLE FALSE),
+	test_Items_Quantity integer OPTIONS (NAMEINSOURCE '`Quantity`'),
+	test_Items_ItemID integer OPTIONS (NAMEINSOURCE '`ItemID`'),
+	FOREIGN KEY("_documentId") REFERENCES test 
+) OPTIONS (NAMEINSOURCE '`test`.`Items`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
+
+CREATE FOREIGN TABLE test_SavedAddresses (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	test_SavedAddresses_idx integer OPTIONS (UPDATABLE FALSE),
+	test_SavedAddresses string OPTIONS (NAMEINSOURCE '`test`.`SavedAddresses`[]'),
+	FOREIGN KEY("_documentId") REFERENCES test 
+) OPTIONS (NAMEINSOURCE '`test`.`SavedAddresses`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');

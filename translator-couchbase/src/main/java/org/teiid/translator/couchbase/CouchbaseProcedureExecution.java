@@ -77,7 +77,6 @@ public class CouchbaseProcedureExecution extends CouchbaseExecution implements P
     public void execute() throws TranslatorException {
         
         this.visitor = this.executionFactory.getN1QLVisitor();
-        this.visitor.setKeySpace(connection.getKeyspaceName());
         this.visitor.append(call);
         String sql = this.visitor.toString();
         LogManager.logDetail(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29002, call, sql));

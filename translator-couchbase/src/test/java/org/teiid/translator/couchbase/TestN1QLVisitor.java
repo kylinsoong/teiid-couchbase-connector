@@ -26,22 +26,22 @@ import static org.junit.Assert.*;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Mockito;
 import org.teiid.adminapi.impl.ModelMetaData;
 import org.teiid.cdk.api.TranslationUtility;
 import org.teiid.core.CoreConstants;
-import org.teiid.couchbase.CouchbaseConnection;
 import org.teiid.dqp.internal.datamgr.RuntimeMetadataImpl;
 import org.teiid.language.Command;
 import org.teiid.metadata.MetadataException;
 import org.teiid.metadata.MetadataFactory;
 import org.teiid.metadata.RuntimeMetadata;
+import org.teiid.metadata.Table;
 import org.teiid.query.metadata.MetadataValidator;
 import org.teiid.query.metadata.SystemMetadata;
 import org.teiid.query.metadata.TransformationMetadata;
 import org.teiid.query.unittest.RealMetadataFactory;
 import org.teiid.query.validator.ValidatorReport;
 import org.teiid.translator.TranslatorException;
+import org.teiid.translator.couchbase.CouchbaseMetadataProcessor.Dimension;
 
 @SuppressWarnings("nls")
 public class TestN1QLVisitor {
@@ -53,18 +53,11 @@ public class TestN1QLVisitor {
 
             CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
             MetadataFactory mf = new MetadataFactory("couchbase", 1, SystemMetadata.getInstance().getRuntimeTypeMap(), mmd);
-            CouchbaseConnection conn = Mockito.mock(CouchbaseConnection.class);
-            Mockito.stub(conn.getKeyspaceName()).toReturn(KEYSPACE);
-            //TODO--
-//            mp.addTable(conn, mf, KEYSPACE, formCustomer(), null);
-//            mp.addTable(conn, mf, KEYSPACE, formOder(), null);
-//            mp.addTable(conn, mf, KEYSPACE, formSimpleJson(), null);
-//            mp.addTable(conn, mf, KEYSPACE, formJson(), null);
-//            mp.addTable(conn, mf, KEYSPACE, formArray(), null);
-//            mp.addTable(conn, mf, KEYSPACE, layerJson(), null);
-//            mp.addTable(conn, mf, KEYSPACE, layerArray(), null);
-//            mp.addTable(conn, mf, KEYSPACE, nestedArray(), null);
-            mp.addProcedures(mf, null);
+            Table customer = createTable(mf, KEYSPACE, "Customer");
+            mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, customer, customer.getName(), false, new Dimension());
+            Table order = createTable(mf, KEYSPACE, "Oder");
+            mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, order, order.getName(), false, new Dimension());
+//            mp.addProcedures(mf, null);
 
             TransformationMetadata tm = RealMetadataFactory.createTransformationMetadata(mf.asMetadataStore(), "x");
             ValidatorReport report = new MetadataValidator().validate(tm.getVdbMetaData(), tm.getMetadataStore());

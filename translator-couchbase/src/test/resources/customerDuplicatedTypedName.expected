@@ -8,12 +8,12 @@ CREATE FOREIGN TABLE Customer (
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
 
-CREATE FOREIGN TABLE SavedAddresses (
+CREATE FOREIGN TABLE Customer_SavedAddresses (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
-	SavedAddresses_idx integer OPTIONS (UPDATABLE FALSE),
-	SavedAddresses string OPTIONS (NAMEINSOURCE '`SavedAddresses`[]'),
+	Customer_SavedAddresses_idx integer OPTIONS (UPDATABLE FALSE),
+	Customer_SavedAddresses string OPTIONS (NAMEINSOURCE '`test`.`SavedAddresses`[]'),
 	FOREIGN KEY("_documentId") REFERENCES Customer 
-) OPTIONS (NAMEINSOURCE '`SavedAddresses`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
+) OPTIONS (NAMEINSOURCE '`test`.`SavedAddresses`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
 
 CREATE FOREIGN TABLE test2_Customer (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
@@ -22,3 +22,10 @@ CREATE FOREIGN TABLE test2_Customer (
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
 ) OPTIONS (NAMEINSOURCE '`test2`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+
+CREATE FOREIGN TABLE test2_Customer_SavedAddresses (
+	"_documentId" string OPTIONS (UPDATABLE FALSE),
+	test2_Customer_SavedAddresses_idx integer OPTIONS (UPDATABLE FALSE),
+	test2_Customer_SavedAddresses string OPTIONS (NAMEINSOURCE '`test2`.`SavedAddresses`[]'),
+	FOREIGN KEY("_documentId") REFERENCES test2_Customer 
+) OPTIONS (NAMEINSOURCE '`test2`.`SavedAddresses`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
