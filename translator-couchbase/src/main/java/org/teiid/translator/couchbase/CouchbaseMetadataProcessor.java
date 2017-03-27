@@ -360,8 +360,9 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             columnType = DataTypeManager.DefaultDataTypes.STRING; // how to handle null type?
         }
         
-        if(table.getProperty(IS_ARRAY_TABLE, false).equals(FALSE_VALUE) && columnName.startsWith(table.getName())){
-            columnName = columnName.substring(table.getName().length() + 1);
+        String tableNameInSource = trimWave(table.getNameInSource());
+        if(table.getProperty(IS_ARRAY_TABLE, false).equals(FALSE_VALUE) && columnName.startsWith(tableNameInSource)){
+            columnName = columnName.substring(tableNameInSource.length() + 1);
         }
         
         if (table.getColumnByName(columnName) == null) {

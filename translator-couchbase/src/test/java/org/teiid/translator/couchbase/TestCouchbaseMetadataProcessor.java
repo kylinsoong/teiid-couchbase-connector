@@ -146,6 +146,16 @@ public class TestCouchbaseMetadataProcessor {
     }
     
     @Test
+    public void testNestedJsonWithTypedName() throws ResourceException {
+        
+        CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
+        MetadataFactory mf = new MetadataFactory("vdb", 1, "couchbase", SystemMetadata.getInstance().getRuntimeTypeMap(), new Properties(), null);
+        Table table = createTable(mf, KEYSPACE, "Sample");
+        mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, nestedJson(), mf, table, "Sample", false, new Dimension());
+        helpTest("nestedJsonTypedName.expected", mf);
+    }
+    
+    @Test
     public void testNestedArray() throws ResourceException {
         
         CouchbaseMetadataProcessor mp = new CouchbaseMetadataProcessor();  
