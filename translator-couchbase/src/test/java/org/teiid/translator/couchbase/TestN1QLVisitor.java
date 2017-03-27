@@ -90,22 +90,45 @@ public class TestN1QLVisitor {
         visitor.setKeySpace(KEYSPACE);
         visitor.append(command);
 
-//        System.out.println(visitor.toString());
+        System.out.println(visitor.toString());
         assertEquals(expected, visitor.toString());
+    }
+    
+    //TODO-- need remove
+    @Test
+    public void testTmp() throws TranslatorException {
+        String sql = "SELECT * FROM Customer_SavedAddresses";
+        helpTest(sql, "");
     }
     
 
     @Test
-    public void testBasicSelect() throws TranslatorException {
+    public void testSelect() throws TranslatorException {
         
-        String sql = "SELECT * FROM test";
-        helpTest(sql, "SELECT META().id AS PK, `test`.Type, `test`.ID, `test`.Name, `test`.CustomerID, `test`.attr_double, `test`.attr_number_short, `test`.attr_string, `test`.attr_boolean, `test`.attr_number_long, `test`.attr_int, `test`.attr_number_integer, `test`.attr_long, `test`.attr_number_float, `test`.attr_null, `test`.attr_number_byte, `test`.attr_number_double FROM `test`");
+        String sql = "SELECT * FROM Customer";
+        helpTest(sql, "SELECT META().id AS PK, `ID`, `type`, `Name` FROM `test` WHERE `type` = 'Customer'");
         
-        sql = "SELECT * FROM test_CreditCard AS T";
-        helpTest(sql, "SELECT META().id AS PK, T.CardNumber, T.Type, T.CVN, T.Expiry FROM `test`.`CreditCard` AS T");
+        sql = "SELECT * FROM Customer AS T";
+        helpTest(sql, "SELECT META().id AS PK, `ID`, `type`, `Name` FROM `test` AS T WHERE `type` = 'Customer'");
         
-        sql = "SELECT * FROM test_CreditCard";
-        helpTest(sql, "SELECT META().id AS PK, CardNumber, Type, CVN, Expiry FROM `test`.`CreditCard`");
+        sql = "SELECT * FROM Customer_SavedAddresses";
+        helpTest(sql, "");
+        
+        sql = "SELECT * FROM Oder";
+        helpTest(sql, "");
+        
+        sql = "SELECT * FROM Oder_Items";
+        helpTest(sql, "");
+    }
+    
+    @Test
+    public void testSelectClause() throws TranslatorException {
+        
+        String sql = "SELECT DISTINCT attr_int FROM test";
+        helpTest(sql, "SELECT DISTINCT `test`.attr_int FROM `test`");
+        
+        sql = "SELECT ALL attr_int FROM test";
+        helpTest(sql, "SELECT `test`.attr_int FROM `test`");
     }
     
     @Test
@@ -186,15 +209,6 @@ public class TestN1QLVisitor {
         helpTest(sql, "SELECT `test`.Name, `test`.Type FROM `test` WHERE META().id = 'customer'");
     }
     
-    @Test
-    public void testSelectClause() throws TranslatorException {
-        
-        String sql = "SELECT DISTINCT attr_int FROM test";
-        helpTest(sql, "SELECT DISTINCT `test`.attr_int FROM `test`");
-        
-        sql = "SELECT ALL attr_int FROM test";
-        helpTest(sql, "SELECT `test`.attr_int FROM `test`");
-    }
     
     @Test
     public void testSetOperations() throws TranslatorException {

@@ -6,7 +6,7 @@ CREATE FOREIGN TABLE Customer (
 	type string OPTIONS (NAMEINSOURCE '`type`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
-) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false', "teiid_couchbase:NAMEDTYPEPAIR" '`type` = ''Customer''');
 
 CREATE FOREIGN TABLE Customer_SavedAddresses (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
@@ -25,7 +25,7 @@ CREATE FOREIGN TABLE Oder (
 	CreditCard_Expiry string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`Expiry`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
-) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false', "teiid_couchbase:NAMEDTYPEPAIR" '`type` = ''Oder''');
 
 CREATE FOREIGN TABLE Oder_Items (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),

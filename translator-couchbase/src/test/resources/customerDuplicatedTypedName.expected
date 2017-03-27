@@ -6,7 +6,7 @@ CREATE FOREIGN TABLE Customer (
 	type string OPTIONS (NAMEINSOURCE '`type`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
-) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false', "teiid_couchbase:NAMEDTYPEPAIR" '`type` = ''Customer''');
 
 CREATE FOREIGN TABLE Customer_SavedAddresses (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
@@ -21,7 +21,7 @@ CREATE FOREIGN TABLE test2_Customer (
 	type string OPTIONS (NAMEINSOURCE '`type`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
-) OPTIONS (NAMEINSOURCE '`test2`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
+) OPTIONS (NAMEINSOURCE '`test2`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false', "teiid_couchbase:NAMEDTYPEPAIR" '`type` = ''test2_Customer''');
 
 CREATE FOREIGN TABLE test2_Customer_SavedAddresses (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),

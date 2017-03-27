@@ -83,7 +83,7 @@ import com.couchbase.client.java.query.N1qlQueryRow;
 public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseConnection> {
     
     public static final String IS_ARRAY_TABLE = MetadataFactory.COUCHBASE_URI + "ISARRAYTABLE"; //$NON-NLS-1$
-    public static final String ARRAY_TABLE_GROUP = MetadataFactory.COUCHBASE_URI + "ARRAYTABLEGROUP"; //$NON-NLS-1$
+    public static final String NAMED_TYPE_PAIR = MetadataFactory.COUCHBASE_URI + "NAMEDTYPEPAIR"; //$NON-NLS-1$
   
     private Integer sampleSize;
     
@@ -189,6 +189,11 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             mf.addColumn(DOCUMENTID, STRING, table);
             mf.addPrimaryKey("PK0", Arrays.asList(DOCUMENTID), table); //$NON-NLS-1$
             
+            if(!name.equals(keyspace)) {
+                String namedTypePair = buildNamedTypePair(typeName, name);
+                table.setProperty(NAMED_TYPE_PAIR, namedTypePair);
+            }
+            
             // scan row
             boolean hasTypeIdentifier = true;
             if(dataSrcTableList.size() == 1 && dataSrcTableList.get(0).equals(keyspace)) {
@@ -210,6 +215,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             }            
         }
     }
+
 
     /**
      * A dispatcher of scan jsonValue(document, of a segment of document), the jsonValue either can be a JsonObject, or JsonArray, 
@@ -398,6 +404,12 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
     private String buildArrayTableName(String name, String path) {
         String tableName = path.substring(path.indexOf(UNDERSCORE));
         return name + tableName;
+    }
+    
+    private String buildNamedTypePair(String columnIdentifierName, String typedValue) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(columnIdentifierName).append(" = '").append(typedValue).append("'"); //$NON-NLS-1$ //$NON-NLS-2$
+        return sb.toString();
     }
     
     private String getTypeName(String keyspace) {

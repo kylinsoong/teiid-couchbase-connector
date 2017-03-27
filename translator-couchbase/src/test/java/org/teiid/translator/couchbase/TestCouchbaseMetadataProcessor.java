@@ -28,6 +28,7 @@ import static org.teiid.translator.couchbase.CouchbaseProperties.FALSE_VALUE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.UNDERSCORE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_ARRAY_TABLE;
+import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.NAMED_TYPE_PAIR;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -217,9 +218,18 @@ public class TestCouchbaseMetadataProcessor {
         table.setNameInSource(WAVE + keyspace + WAVE);
         table.setSupportsUpdate(true);
         table.setProperty(IS_ARRAY_TABLE, FALSE_VALUE);
+        if(!tableName.equals(keyspace)){
+            table.setProperty(NAMED_TYPE_PAIR, buildNamedTypePair("`type`", tableName));
+        }
         mf.addColumn(DOCUMENTID, STRING, table);
         mf.addPrimaryKey("PK0", Arrays.asList(DOCUMENTID), table); //$NON-NLS-1$
         return table;
+    }
+    
+    private static String buildNamedTypePair(String columnIdentifierName, String typedValue) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(columnIdentifierName).append(" = '").append(typedValue).append("'"); //$NON-NLS-1$ //$NON-NLS-2$
+        return sb.toString();
     }
     
     static JsonObject formCustomer() {
