@@ -345,7 +345,10 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
         return table;
     }
 
-    private void addColumn(String columnName, String columnType, Object columnValue, boolean updatable, String nameInSource, Table table, MetadataFactory mf) {
+    private void addColumn(String name, String type, Object columnValue, boolean updatable, String nameInSource, Table table, MetadataFactory mf) {
+        
+        String columnName = name;
+        String columnType = type;
         
         if(columnType == null && columnValue == null && table.getColumnByName(columnName) == null) {
             columnType = TypeFacility.RUNTIME_NAMES.STRING;
@@ -355,6 +358,10 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
         
         if(DataTypeManager.DefaultDataTypes.NULL.equals(columnType)) {
             columnType = DataTypeManager.DefaultDataTypes.STRING; // how to handle null type?
+        }
+        
+        if(table.getProperty(IS_ARRAY_TABLE, false).equals(FALSE_VALUE) && columnName.startsWith(table.getName())){
+            columnName = columnName.substring(table.getName().length() + 1);
         }
         
         if (table.getColumnByName(columnName) == null) {

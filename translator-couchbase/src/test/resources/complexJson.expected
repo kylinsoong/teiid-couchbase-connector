@@ -2,7 +2,7 @@ SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbas
 
 CREATE FOREIGN TABLE test (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
-	test_attr_jsonObject_Name string OPTIONS (NAMEINSOURCE '`test`.`attr_jsonObject`.`Name`'),
+	attr_jsonObject_Name string OPTIONS (NAMEINSOURCE '`test`.`attr_jsonObject`.`Name`'),
 	Name string OPTIONS (NAMEINSOURCE '`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY("_documentId")
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');

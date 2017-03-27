@@ -3,7 +3,7 @@ SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbas
 CREATE FOREIGN TABLE test (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
 	attr_double double OPTIONS (NAMEINSOURCE '`attr_double`'),
-	test_attr_jsonObject_key string OPTIONS (NAMEINSOURCE '`test`.`attr_jsonObject`.`key`'),
+	attr_jsonObject_key string OPTIONS (NAMEINSOURCE '`test`.`attr_jsonObject`.`key`'),
 	attr_string string OPTIONS (NAMEINSOURCE '`attr_string`'),
 	attr_long long OPTIONS (NAMEINSOURCE '`attr_long`'),
 	attr_null string OPTIONS (NAMEINSOURCE '`attr_null`'),
