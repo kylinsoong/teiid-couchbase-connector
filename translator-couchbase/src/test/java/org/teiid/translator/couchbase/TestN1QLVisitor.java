@@ -57,7 +57,12 @@ public class TestN1QLVisitor {
             mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formCustomer(), mf, customer, customer.getName(), false, new Dimension());
             Table order = createTable(mf, KEYSPACE, "Oder");
             mp.scanRow(KEYSPACE, KEYSPACE_SOURCE, formOder(), mf, order, order.getName(), false, new Dimension());
-//            mp.addProcedures(mf, null);
+            Table t2 = createTable(mf, "T2", "T2");
+            mp.scanRow("T2", "`T2`", formDataTypeJson(), mf, t2, t2.getName(), false, new Dimension());
+            Table t3 = createTable(mf, "T3", "T3");
+            mp.scanRow("T3", "`T3`", nestedJson(), mf, t3, t3.getName(), false, new Dimension());
+            mp.scanRow("T3", "`T3`", nestedArray(), mf, t3, t3.getName(), false, new Dimension());
+            mp.addProcedures(mf, null);
 
             TransformationMetadata tm = RealMetadataFactory.createTransformationMetadata(mf.asMetadataStore(), "x");
             ValidatorReport report = new MetadataValidator().validate(tm.getVdbMetaData(), tm.getMetadataStore());
@@ -94,215 +99,185 @@ public class TestN1QLVisitor {
         assertEquals(expected, visitor.toString());
     }
     
-    //TODO-- need remove
-    @Test
-    public void testTmp() throws TranslatorException {
-        String sql = "SELECT * FROM Customer_SavedAddresses";
-        helpTest(sql, "");
-    }
-    
-
     @Test
     public void testSelect() throws TranslatorException {
         
         String sql = "SELECT * FROM Customer";
         helpTest(sql, "SELECT META().id AS PK, `ID`, `type`, `Name` FROM `test` WHERE `type` = 'Customer'");
-        
-        sql = "SELECT * FROM Customer AS T";
-        helpTest(sql, "SELECT META().id AS PK, `ID`, `type`, `Name` FROM `test` AS T WHERE `type` = 'Customer'");
-        
+      
         sql = "SELECT * FROM Customer_SavedAddresses";
-        helpTest(sql, "");
+        helpTest(sql, "SELECT META().id AS PK, `SavedAddresses` FROM `test`.`SavedAddresses`");
+        
+        sql = "SELECT * FROM Customer_SavedAddresses AS T";
+        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`SavedAddresses` AS T");
         
         sql = "SELECT * FROM Oder";
-        helpTest(sql, "");
+        helpTest(sql, "SELECT META().id AS PK, `CustomerID`, `type`, `test`.`CreditCard`.`CardNumber`, `test`.`CreditCard`.`Type`, `test`.`CreditCard`.`CVN`, `test`.`CreditCard`.`Expiry`, `Name` FROM `test` WHERE `type` = 'Oder'");
         
         sql = "SELECT * FROM Oder_Items";
-        helpTest(sql, "");
+        helpTest(sql, "SELECT META().id AS PK, `Items` FROM `test`.`Items`");
+        
+        sql = "SELECT * FROM Oder_Items AS T";
+        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`Items` AS T");
     }
     
     @Test
     public void testSelectClause() throws TranslatorException {
         
-        String sql = "SELECT DISTINCT attr_int FROM test";
-        helpTest(sql, "SELECT DISTINCT `test`.attr_int FROM `test`");
+        String sql = "SELECT DISTINCT Name FROM Customer";
+        helpTest(sql, "SELECT DISTINCT `Name` FROM `test` WHERE `type` = 'Customer'");
         
-        sql = "SELECT ALL attr_int FROM test";
-        helpTest(sql, "SELECT `test`.attr_int FROM `test`");
+        sql = "SELECT ALL Name FROM Customer";
+        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer'");
+    }
+    
+    @Test
+    public void testNestedJson() throws TranslatorException  {
+        
+        String sql = "SELECT * FROM T3";
+        helpTest(sql, "SELECT META().id AS PK, `T3`.`nestedJson`.`nestedJson`.`nestedJson`.`nestedJson`, `T3`.`nestedJson`.`nestedJson`.`nestedJson`.`Dimension`, `T3`.`nestedJson`.`nestedJson`.`Dimension`, `T3`.`nestedJson`.`Dimension`, `Name` FROM `T3`");
     }
     
     @Test
     public void testNestedArray() throws TranslatorException {
         
-        String sql = "SELECT * FROM test_SavedAddresses";
-        helpTest(sql, "SELECT META().id AS PK, SavedAddresses FROM `test`.`SavedAddresses`");
+        String sql = "SELECT * FROM T3_nestedArray";
+        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
         
-        sql = "SELECT * FROM test_SavedAddresses AS T";
-        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`SavedAddresses` AS T");
+        sql = "SELECT * FROM T3_nestedArray_dim1";
+        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
         
-        sql = "SELECT * FROM test_Items";
-        helpTest(sql, "SELECT META().id AS PK, Items FROM `test`.`Items`");
+        sql = "SELECT * FROM T3_nestedArray_dim1_dim2";
+        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
         
-        sql = "SELECT * FROM test_Items AS T";
-        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`Items` AS T");
-    }
-    
-    @Test
-    public void testNestedArrayLoop() throws TranslatorException {
-        String sql = "SELECT * FROM test_nestedArray";
-        helpTest(sql, "SELECT META().id AS PK, nestedArray FROM `test`.`nestedArray`");
-        
-        sql = "SELECT * FROM test_nestedArray AS T";
-        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`nestedArray` AS T");
+        sql = "SELECT * FROM T3_nestedArray_dim1_dim2_dim3";
+        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
     }
     
     @Test
     public void testPKColumn() throws TranslatorException {
         
-        String sql = "SELECT documentId FROM test";
-        helpTest(sql, "SELECT META().id AS PK FROM `test`");
+        String sql = "SELECT \"_documentId\" FROM T3";
+        helpTest(sql, "SELECT META().id AS PK FROM `T3`");
         
-        sql = "SELECT documentId FROM test_CreditCard";
-        helpTest(sql, "SELECT META().id AS PK FROM `test`.`CreditCard`");
+        sql = "SELECT \"_documentId\" FROM T3_nestedArray";
+        helpTest(sql, "SELECT META().id AS PK FROM `T3`.`nestedArray`");
     }
     
     @Test
     public void testLimitOffsetClause() throws TranslatorException {
         
-        String sql = "SELECT Name FROM test LIMIT 2";
-        helpTest(sql, "SELECT `test`.Name FROM `test` LIMIT 2");
+        String sql = "SELECT Name FROM Customer LIMIT 2";
+        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer' LIMIT 2");
         
-        sql = "SELECT Name FROM test LIMIT 2, 2";
-        helpTest(sql, "SELECT `test`.Name FROM `test` LIMIT 2 OFFSET 2");
+        sql = "SELECT Name FROM Customer LIMIT 2, 2";
+        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer' LIMIT 2 OFFSET 2");
         
-        sql = "SELECT Name FROM test OFFSET 2 ROWS";
-        helpTest(sql, "SELECT `test`.Name FROM `test` LIMIT 2147483647 OFFSET 2");
+        sql = "SELECT Name FROM Customer OFFSET 2 ROWS";
+        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer' LIMIT 2147483647 OFFSET 2");
     }
     
     @Test
     public void testOrderByClause() throws TranslatorException {
         
-        String sql = "SELECT Name, Type FROM test ORDER BY Name";
-        helpTest(sql, "SELECT `test`.Name, `test`.Type FROM `test` ORDER BY `test`.Name");
+        String sql = "SELECT Name, type FROM Customer ORDER BY Name";
+        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE `type` = 'Customer' ORDER BY `Name`");
         
-        sql = "SELECT Type FROM test ORDER BY Name"; //Unrelated
-        helpTest(sql, "SELECT `test`.Type FROM `test` ORDER BY `test`.Name");
+        sql = "SELECT type FROM Customer ORDER BY Name"; //Unrelated
+        helpTest(sql, "SELECT `type` FROM `test` WHERE `type` = 'Customer' ORDER BY `Name`");
         
-        sql = "SELECT Name, Type FROM test ORDER BY Type"; //NullOrdering
-        helpTest(sql, "SELECT `test`.Name, `test`.Type FROM `test` ORDER BY `test`.Type");
+        sql = "SELECT Name, type FROM Customer ORDER BY type"; //NullOrdering
+        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE `type` = 'Customer' ORDER BY `type`");
     }
     
     @Test
     public void testGroupByClause() throws TranslatorException {
         
-        String sql = "SELECT Name, COUNT(*) FROM test GROUP BY Name";
-        helpTest(sql, "SELECT `test`.Name, COUNT(*) FROM `test` GROUP BY `test`.Name");
+        String sql = "SELECT Name, COUNT(*) FROM Customer GROUP BY Name";
+        helpTest(sql, "SELECT `Name`, COUNT(*) FROM `test` WHERE `type` = 'Customer' GROUP BY `Name`");
     }
     
     @Test
     public void testWhereClause() throws TranslatorException {
         
-        String sql = "SELECT Name, Type  FROM test WHERE Name = 'John Doe'";
-        helpTest(sql, "SELECT `test`.Name, `test`.Type FROM `test` WHERE `test`.Name = 'John Doe'");
+        String sql = "SELECT Name, type  FROM Customer WHERE Name = 'John Doe'";
+        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE `Name` = 'John Doe' AND `type` = 'Customer'");
         
-        sql = "SELECT Name, Type  FROM test WHERE documentId = 'customer'";
-        helpTest(sql, "SELECT `test`.Name, `test`.Type FROM `test` WHERE META().id = 'customer'");
-    }
-    
-    
-    @Test
-    public void testSetOperations() throws TranslatorException {
-        
-        String sql = "SELECT attr_int, attr_long FROM test UNION ALL SELECT attr_int, attr_long FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT `test`.attr_int, `test`.attr_long FROM `test` UNION ALL SELECT attr_int, attr_long FROM `test`.`attr_jsonObject`");
-        
-        sql = "SELECT attr_int, attr_long FROM test UNION SELECT attr_int, attr_long FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT `test`.attr_int, `test`.attr_long FROM `test` UNION SELECT attr_int, attr_long FROM `test`.`attr_jsonObject`");
-        
-        sql = "SELECT attr_int, attr_long FROM test INTERSECT SELECT attr_int, attr_long FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT `test`.attr_int, `test`.attr_long FROM `test` INTERSECT SELECT attr_int, attr_long FROM `test`.`attr_jsonObject`");
-        
-        sql = "SELECT attr_int, attr_long FROM test EXCEPT SELECT attr_int, attr_long FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT `test`.attr_int, `test`.attr_long FROM `test` EXCEPT SELECT attr_int, attr_long FROM `test`.`attr_jsonObject`");
+        sql = "SELECT Name, type  FROM Customer WHERE \"_documentId\" = 'customer'";
+        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE META().id = 'customer' AND `type` = 'Customer'");
     }
     
     @Test
     public void testStringFunctions() throws TranslatorException {
         
-        String sql = "SELECT LCASE(attr_string) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT LOWER(attr_string) FROM `test`.`attr_jsonObject`");
+        String sql = "SELECT LCASE(attr_string) FROM T2";
+        helpTest(sql, "SELECT LOWER(`attr_string`) FROM `T2`");
         
-        sql = "SELECT UCASE(attr_string) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT UPPER(attr_string) FROM `test`.`attr_jsonObject`");
+        sql = "SELECT UCASE(attr_string) FROM T2";
+        helpTest(sql, "SELECT UPPER(`attr_string`) FROM `T2`");
         
-        sql = "SELECT TRANSLATE(attr_string, 'is', 'are') FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT REPLACE(attr_string, 'is', 'are') FROM `test`.`attr_jsonObject`");
+        sql = "SELECT TRANSLATE(attr_string, 'is', 'are') FROM T2";
+        helpTest(sql, "SELECT REPLACE(`attr_string`, 'is', 'are') FROM `T2`");
         
-        sql = "SELECT couchbase.CONTAINS(attr_string, 'is') FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT CONTAINS(attr_string, 'is') FROM `test`.`attr_jsonObject`");
+        sql = "SELECT couchbase.CONTAINS(attr_string, 'is') FROM T2";
+        helpTest(sql, "SELECT CONTAINS(`attr_string`, 'is') FROM `T2`");
         
-        sql = "SELECT couchbase.TITLE(attr_string) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT TITLE(attr_string) FROM `test`.`attr_jsonObject`");
+        sql = "SELECT couchbase.TITLE(attr_string) FROM T2";
+        helpTest(sql, "SELECT TITLE(`attr_string`) FROM `T2`");
         
-        sql = "SELECT couchbase.LTRIM(attr_string, 'This') FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT LTRIM(attr_string, 'This') FROM `test`.`attr_jsonObject`");
+        sql = "SELECT couchbase.LTRIM(attr_string, 'This') FROM T2";
+        helpTest(sql, "SELECT LTRIM(`attr_string`, 'This') FROM `T2`");
         
-        sql = "SELECT couchbase.TRIM(attr_string, 'is') FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT TRIM(attr_string, 'is') FROM `test`.`attr_jsonObject`");
+        sql = "SELECT couchbase.TRIM(attr_string, 'is') FROM T2";
+        helpTest(sql, "SELECT TRIM(`attr_string`, 'is') FROM `T2`");
         
-        sql = "SELECT couchbase.RTRIM(attr_string, 'value') FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT RTRIM(attr_string, 'value') FROM `test`.`attr_jsonObject`");
+        sql = "SELECT couchbase.RTRIM(attr_string, 'value') FROM T2";
+        helpTest(sql, "SELECT RTRIM(`attr_string`, 'value') FROM `T2`");
         
-        sql = "SELECT couchbase.POSITION(attr_string, 'is') FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT POSITION(attr_string, 'is') FROM `test`.`attr_jsonObject`");
+        sql = "SELECT couchbase.POSITION(attr_string, 'is') FROM T2";
+        helpTest(sql, "SELECT POSITION(`attr_string`, 'is') FROM `T2`");
     }
     
     @Test
     public void testNumbericFunctions() throws TranslatorException {
         
-        String sql = "SELECT CEILING(attr_number_float) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT CEIL(TONUMBER(attr_number_float)) FROM `test`.`attr_jsonObject`"); 
+        String sql = "SELECT CEILING(attr_double) FROM T2";
+        helpTest(sql, "SELECT CEIL(`attr_double`) FROM `T2`"); 
         
-        sql = "SELECT LOG(attr_number_double) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT LN(attr_number_double) FROM `test`.`attr_jsonObject`"); 
+        sql = "SELECT LOG(attr_double) FROM T2";
+        helpTest(sql, "SELECT LN(`attr_double`) FROM `T2`"); 
         
-        sql = "SELECT LOG10(attr_number_double) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT LOG(attr_number_double) FROM `test`.`attr_jsonObject`"); 
+        sql = "SELECT LOG10(attr_double) FROM T2";
+        helpTest(sql, "SELECT LOG(`attr_double`) FROM `T2`"); 
         
-        sql = "SELECT RAND(attr_number_integer) FROM test_attr_jsonObject";
-        helpTest(sql, "SELECT RANDOM(attr_number_integer) FROM `test`.`attr_jsonObject`"); 
+        sql = "SELECT RAND(attr_integer) FROM T2";
+        helpTest(sql, "SELECT RANDOM(`attr_integer`) FROM `T2`"); 
     }
     
     @Test
     public void testConversionFunctions() throws TranslatorException {
-        
-        String sql = "SELECT convert(attr_number_float, double) FROM test";
-        helpTest(sql, "SELECT TONUMBER(`test`.attr_number_float) FROM `test`"); 
-        
-        sql = "SELECT convert(attr_number_byte, boolean) FROM test";
-        helpTest(sql, "SELECT TOBOOLEAN(`test`.attr_number_byte) FROM `test`");
-        
-        sql = "SELECT convert(attr_number_long, string) FROM test";
-        helpTest(sql, "SELECT TOSTRING(`test`.attr_number_long) FROM `test`");
+
+        String sql = "SELECT convert(attr_long, string) FROM T2";
+        helpTest(sql, "SELECT TOSTRING(`attr_long`) FROM `T2`");
     }
     
     @Test
     public void testDateFunctions() throws TranslatorException {
         
-        String sql = "SELECT couchbase.CLOCK_MILLIS() FROM test";
-        helpTest(sql, "SELECT CLOCK_MILLIS() FROM `test`"); 
+        String sql = "SELECT couchbase.CLOCK_MILLIS() FROM T2";
+        helpTest(sql, "SELECT CLOCK_MILLIS() FROM `T2`"); 
         
-        sql = "SELECT couchbase.CLOCK_STR() FROM test";
-        helpTest(sql, "SELECT CLOCK_STR() FROM `test`"); 
+        sql = "SELECT couchbase.CLOCK_STR() FROM T2";
+        helpTest(sql, "SELECT CLOCK_STR() FROM `T2`"); 
         
-        sql = "SELECT couchbase.CLOCK_STR('2006-01-02') FROM test";
-        helpTest(sql, "SELECT CLOCK_STR('2006-01-02') FROM `test`");
+        sql = "SELECT couchbase.CLOCK_STR('2006-01-02') FROM T2";
+        helpTest(sql, "SELECT CLOCK_STR('2006-01-02') FROM `T2`");
                 
-        sql = "SELECT couchbase.DATE_ADD_MILLIS(1488873653696, 2, 'century') FROM test";
-        helpTest(sql, "SELECT DATE_ADD_MILLIS(1488873653696, 2, 'century') FROM `test`"); 
+        sql = "SELECT couchbase.DATE_ADD_MILLIS(1488873653696, 2, 'century') FROM T2";
+        helpTest(sql, "SELECT DATE_ADD_MILLIS(1488873653696, 2, 'century') FROM `T2`"); 
         
-        sql = "SELECT couchbase.DATE_ADD_STR('2017-03-08', 2, 'century') FROM test";
-        helpTest(sql, "SELECT DATE_ADD_STR('2017-03-08', 2, 'century') FROM `test`"); 
+        sql = "SELECT couchbase.DATE_ADD_STR('2017-03-08', 2, 'century') FROM T2";
+        helpTest(sql, "SELECT DATE_ADD_STR('2017-03-08', 2, 'century') FROM `T2`"); 
     }
     
     @Test
@@ -324,7 +299,7 @@ public class TestN1QLVisitor {
         helpTest(sql, "SELECT result FROM `test` AS result USE PRIMARY KEYS 'customer'");
         
         sql = "call saveDocument('k001', '{\"key\": \"value\"}')";
-        helpTest(sql, "UPSERT INTO `test` AS result (KEY, VALUE) VALUES ('k001', '{\"key\": \"value\"}') RETURNING result");
+        helpTest(sql, "UPSERT INTO `test` AS result (KEY, VALUE) VALUES ('k001', '{\"key\": \"value\"}')");
         
         sql = "call deleteDocument('k001')";
         helpTest(sql, "DELETE FROM `test` AS result USE PRIMARY KEYS 'k001' RETURNING result");

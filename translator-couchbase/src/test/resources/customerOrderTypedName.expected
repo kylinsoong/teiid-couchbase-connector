@@ -30,7 +30,7 @@ CREATE FOREIGN TABLE Oder (
 CREATE FOREIGN TABLE Oder_Items (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
 	Oder_Items_idx integer OPTIONS (UPDATABLE FALSE),
-	Oder_Items_Quantity integer OPTIONS (NAMEINSOURCE '`Quantity`'),
-	Oder_Items_ItemID integer OPTIONS (NAMEINSOURCE '`ItemID`'),
+	Oder_Items_Quantity integer OPTIONS (NAMEINSOURCE '`test`.`Items`[].`Quantity`'),
+	Oder_Items_ItemID integer OPTIONS (NAMEINSOURCE '`test`.`Items`[].`ItemID`'),
 	FOREIGN KEY("_documentId") REFERENCES Oder 
 ) OPTIONS (NAMEINSOURCE '`test`.`Items`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');

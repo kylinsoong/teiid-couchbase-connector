@@ -298,7 +298,8 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
                             }
                         } else {
                             String columnName = table.getName() + UNDERSCORE + name;
-                            addColumn(columnName, columnType, columnValue, true, nameInSource(name), table, mf);
+                            String columnNameInSource = table.getNameInSource() + SOURCE_SEPARATOR + nameInSource(name);
+                            addColumn(columnName, columnType, columnValue, true, columnNameInSource, table, mf);
                         }
                     }
                     

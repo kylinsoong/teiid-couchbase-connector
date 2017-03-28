@@ -19,7 +19,7 @@ CREATE FOREIGN TABLE test_attr_jsonArray (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
 	test_attr_jsonArray_idx integer OPTIONS (UPDATABLE FALSE),
 	test_attr_jsonArray object OPTIONS (NAMEINSOURCE '`test`.`attr_jsonArray`[]'),
-	test_attr_jsonArray_key string OPTIONS (NAMEINSOURCE '`key`'),
+	test_attr_jsonArray_key string OPTIONS (NAMEINSOURCE '`test`.`attr_jsonArray`[].`key`'),
 	FOREIGN KEY("_documentId") REFERENCES test 
 ) OPTIONS (NAMEINSOURCE '`test`.`attr_jsonArray`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
 

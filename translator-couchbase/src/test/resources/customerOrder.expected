@@ -16,8 +16,8 @@ CREATE FOREIGN TABLE test (
 CREATE FOREIGN TABLE test_Items (
 	"_documentId" string OPTIONS (UPDATABLE FALSE),
 	test_Items_idx integer OPTIONS (UPDATABLE FALSE),
-	test_Items_Quantity integer OPTIONS (NAMEINSOURCE '`Quantity`'),
-	test_Items_ItemID integer OPTIONS (NAMEINSOURCE '`ItemID`'),
+	test_Items_Quantity integer OPTIONS (NAMEINSOURCE '`test`.`Items`[].`Quantity`'),
+	test_Items_ItemID integer OPTIONS (NAMEINSOURCE '`test`.`Items`[].`ItemID`'),
 	FOREIGN KEY("_documentId") REFERENCES test 
 ) OPTIONS (NAMEINSOURCE '`test`.`Items`[]', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'true');
 

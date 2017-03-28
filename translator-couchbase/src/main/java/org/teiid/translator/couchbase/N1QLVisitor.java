@@ -51,9 +51,13 @@ import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_ARRAY
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.NAMED_TYPE_PAIR;
 import static org.teiid.translator.couchbase.CouchbaseProperties.TRUE_VALUE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENTID;
+import static org.teiid.translator.couchbase.CouchbaseProperties.SOURCE_SEPARATOR;
+import static org.teiid.translator.couchbase.CouchbaseProperties.SQUARE_BRACKETS;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.teiid.language.Argument;
 import org.teiid.language.Call;
@@ -74,15 +78,18 @@ import org.teiid.language.SQLConstants.Tokens;
 import org.teiid.language.Select;
 import org.teiid.language.TableReference;
 import org.teiid.language.visitor.SQLStringVisitor;
+import org.teiid.metadata.Table;
 
 public class N1QLVisitor extends SQLStringVisitor{
     
     private CouchbaseExecutionFactory ef;
     
     private boolean recordColumnName = true;
-    private boolean isNestedArrayColumns = false;
+    private boolean isArrayIdxColumn= false;
+    private boolean isNestedJsonInArrayColumn = false;
     private List<String> selectColumns = new ArrayList<>();
     private List<String> selectColumnReferences = new ArrayList<>();
+    private Set<String> arrayTables = new HashSet<>();
 
     public N1QLVisitor(CouchbaseExecutionFactory ef) {
         this.ef = ef;
@@ -91,16 +98,36 @@ public class N1QLVisitor extends SQLStringVisitor{
     @Override
     protected void append(List<? extends LanguageObject> items) {
         
+        arrayTables.clear();
+        
         if (items != null && items.size() != 0) {
             append(items.get(0));
             for (int i = 1; i < items.size(); i++) {
-                if(!isNestedArrayColumns) {
+                if(!isArrayIdxColumn && !isNestedJsonInArrayColumn) {
                     buffer.append(COMMA).append(SPACE);
+                } else {
+                    isArrayIdxColumn = false;
                 }
                 append(items.get(i));
             }
         }
-        isNestedArrayColumns = false;
+        isArrayIdxColumn = false;
+        isNestedJsonInArrayColumn = false;
+    }
+
+    @Override
+    protected void appendBaseName(NamedTable obj) {
+        
+        Table groupID = obj.getMetadataObject();
+        if(groupID != null) {  
+            String nameInSource = getName(groupID);
+            while(nameInSource.endsWith(SQUARE_BRACKETS)) {
+                nameInSource = nameInSource.substring(0, nameInSource.length() - SQUARE_BRACKETS.length());
+            }
+            buffer.append(nameInSource);
+        } else {
+            buffer.append(obj.getName());
+        } 
     }
 
     @Override
@@ -155,7 +182,9 @@ public class N1QLVisitor extends SQLStringVisitor{
             if(reference instanceof NamedTable) {
                 NamedTable table = (NamedTable) reference;
                 String namePair = table.getMetadataObject().getProperty(NAMED_TYPE_PAIR, false);
-                typedName.add(namePair);
+                if(namePair != null && namePair.length() > 2) {
+                    typedName.add(namePair);
+                }
             }
         }
 
@@ -187,9 +216,8 @@ public class N1QLVisitor extends SQLStringVisitor{
     @Override
     public void visit(ColumnReference obj) {
         
-        NamedTable groupTable = obj.getTable();
-        if(groupTable != null) {
-//            String group = obj.getTable().getCorrelationName();
+        if(obj.getTable() != null) {
+            String group = obj.getTable().getCorrelationName();
             String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false);
       
             
@@ -202,38 +230,70 @@ public class N1QLVisitor extends SQLStringVisitor{
                 }
                 return;
             }
-            
-            System.out.println(obj);
-            System.out.println(obj.getName());
-            
+                        
+            String selectColumnName = null;
             if(isArrayTable.equals(TRUE_VALUE)) { // handle array
                 if(obj.getName().endsWith(IDX_SUFFIX)) {
-                    return;
+                    selectColumnName = IDX_SUFFIX;
+                    isArrayIdxColumn = true;
+                } else {
+                    String columnNameInSource = obj.getMetadataObject().getNameInSource();
+                    if(columnNameInSource != null && columnNameInSource.length() > 2 && columnNameInSource.endsWith(SQUARE_BRACKETS)) {
+                        if(group != null) {
+                            buffer.append(group);
+                            selectColumnName = group;
+                        } else {
+                            String columnName = columnNameInSource.substring(columnNameInSource.lastIndexOf(SOURCE_SEPARATOR) + 1, columnNameInSource.length() - SQUARE_BRACKETS.length());
+                            while(columnName.endsWith(SQUARE_BRACKETS)) {
+                                columnName = columnName.substring(0, columnName.length() - SQUARE_BRACKETS.length());
+                            }
+                            buffer.append(columnName);
+                            selectColumnName = trimWave(columnName);
+                        }
+                    } else if(columnNameInSource != null && columnNameInSource.length() > 2 && columnNameInSource.contains(SQUARE_BRACKETS) && columnNameInSource.startsWith(getName(obj.getTable().getMetadataObject()))) {
+                        String tableNameInSource = getName(obj.getTable().getMetadataObject());
+                        String groupName;
+                        if(group != null) {
+                            groupName = group;
+                        } else {
+                            String columnName = tableNameInSource.substring(tableNameInSource.lastIndexOf(SOURCE_SEPARATOR) + 1, tableNameInSource.length() - SQUARE_BRACKETS.length());
+                            while(columnName.endsWith(SQUARE_BRACKETS)) {
+                                columnName = columnName.substring(0, columnName.length() - SQUARE_BRACKETS.length());
+                            }
+                            groupName = columnName;
+                        }
+                        if(!this.arrayTables.contains(groupName)) {
+                            this.arrayTables.add(groupName);
+                            this.selectColumns.add(groupName);
+                            buffer.append(groupName);
+                            this.isNestedJsonInArrayColumn = true;
+                        }
+                        selectColumnName = columnNameInSource.substring(columnNameInSource.lastIndexOf(SOURCE_SEPARATOR) + 1, columnNameInSource.length());
+                        selectColumnName = trimWave(selectColumnName);
+                    }
                 }
                 
-            } else {
-                String columnName = nameInSource(obj.getName());
-                buffer.append(columnName);
+            } else { // handle object and nested object
+                String columnNameInSource = obj.getMetadataObject().getNameInSource();
+                if(columnNameInSource != null && columnNameInSource.length() > 2) {
+                    buffer.append(columnNameInSource);
+                    if(columnNameInSource.contains(SOURCE_SEPARATOR)){
+                        selectColumnName = columnNameInSource.substring(columnNameInSource.lastIndexOf(SOURCE_SEPARATOR) + 1, columnNameInSource.length());
+                    } else {
+                        selectColumnName = columnNameInSource ;
+                    }
+                    selectColumnName = trimWave(selectColumnName);
+                } else {
+                    String columnName = nameInSource(obj.getName());
+                    buffer.append(columnName);
+                    selectColumnName = columnName;
+                }
+                
             }
             
-//            if(isArrayTable.equals(TRUE_VALUE) && !isNestedArrayColumns){
-//                if(group == null) {
-//                    group = obj.getTable().getMetadataObject().getProperty(ARRAY_TABLE_GROUP, false);
-//                }
-//                buffer.append(group);
-//                selectColumns.add(group);
-//                isNestedArrayColumns = true;
-//            } else if(isArrayTable.equals(FALSE_VALUE) && isTopTable.equals(FALSE_VALUE) && group == null) {
-//                shortNameOnly = true;
-//                super.visit(obj);
-//                shortNameOnly = false;
-//            } else if(isArrayTable.equals(FALSE_VALUE)){
-//                super.visit(obj);
-//            }
-//            
             //add selectColumns
-            if(recordColumnName){
-                selectColumns.add(obj.getName());
+            if(recordColumnName && selectColumnName != null){
+                selectColumns.add(selectColumnName);
             }
         } else {
             super.visit(obj);
@@ -370,8 +430,8 @@ public class N1QLVisitor extends SQLStringVisitor{
 
     private void appendClobN1QL() {
         buffer.append(SELECT).append(SPACE);
-        buffer.append("META").append(LPAREN).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$
-        buffer.append(Reserved.AS).append(SPACE).append(ID); //$NON-NLS-1$
+        buffer.append("META").append(LPAREN).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$ //$NON-NLS-2$
+        buffer.append(Reserved.AS).append(SPACE).append(ID); 
         buffer.append(COMMA).append(SPACE); 
         buffer.append(RESULT).append(SPACE); 
         buffer.append(Reserved.FROM).append(SPACE);
@@ -389,17 +449,28 @@ public class N1QLVisitor extends SQLStringVisitor{
     
     private void appendN1QLWhere(Call call) {
         buffer.append(Reserved.WHERE).append(SPACE);
-        buffer.append("META").append(LPAREN).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$
+        buffer.append("META").append(LPAREN).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$ //$NON-NLS-2$
         buffer.append(Reserved.LIKE).append(SPACE);
         append(call.getArguments().get(0));
     }
     
     private void appendN1QLPK(Call call) {
-        buffer.append("USE PRIMARY KEYS").append(SPACE);
+        buffer.append("USE PRIMARY KEYS").append(SPACE); //$NON-NLS-1$
         append(call.getArguments().get(0));
     }
     
     private String nameInSource(String path) {
         return WAVE + path + WAVE; 
+    }
+    
+    private String trimWave(String value) {
+        String results = value;
+        if(results.startsWith(WAVE)) {
+            results = results.substring(1);
+        }
+        if(results.endsWith(WAVE)) {
+            results = results.substring(0, results.length() - 1);
+        }
+        return results;
     }
 }
