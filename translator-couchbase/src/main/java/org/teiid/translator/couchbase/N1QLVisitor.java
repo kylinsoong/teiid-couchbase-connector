@@ -59,7 +59,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.teiid.language.Argument;
 import org.teiid.language.Call;
 import org.teiid.language.ColumnReference;
 import org.teiid.language.Comparison;
@@ -71,7 +70,6 @@ import org.teiid.language.Limit;
 import org.teiid.language.Literal;
 import org.teiid.language.NamedTable;
 import org.teiid.language.OrderBy;
-import org.teiid.language.Argument.Direction;
 import org.teiid.language.SQLConstants.NonReserved;
 import org.teiid.language.SQLConstants.Reserved;
 import org.teiid.language.SQLConstants.Tokens;

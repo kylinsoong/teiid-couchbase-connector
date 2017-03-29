@@ -98,8 +98,8 @@ public class CouchbaseProcedureExecution extends CouchbaseExecution implements P
             if(procName.equalsIgnoreCase(GETTEXTDOCUMENTS) || procName.equalsIgnoreCase(GETTEXTDOCUMENT)) {
                 JsonObject json = row.value();
                 ArrayList<Object> result = new ArrayList<>(2);
-                result.add(this.executionFactory.retrieveValue(ID, String.class, json.get(ID)));
-                result.add(this.executionFactory.retrieveValue(RESULT, ClobType.class, json.get(RESULT)));
+                result.add(this.executionFactory.retrieveValue(String.class, json.get(ID)));
+                result.add(this.executionFactory.retrieveValue(ClobType.class, json.get(RESULT)));
                 return result;
             } else if(procName.equalsIgnoreCase(GETDOCUMENTS) || procName.equalsIgnoreCase(GETDOCUMENT) || procName.equalsIgnoreCase(GETTEXTMETADATADOCUMENT) || procName.equalsIgnoreCase(GETMETADATADOCUMENT)) {
                 ArrayList<Object> result = new ArrayList<>(1);
@@ -121,7 +121,7 @@ public class CouchbaseProcedureExecution extends CouchbaseExecution implements P
                 return result;
             } else if(procName.equalsIgnoreCase(SAVEDOCUMENT) || procName.equalsIgnoreCase(DELETEDOCUMENT)) {
                 ArrayList<Object> result = new ArrayList<>(1);
-                result.add(this.executionFactory.retrieveValue(RESULT, ClobType.class, JsonObject.create().put(RESULT, "SUCCESS"))); //$NON-NLS-1$
+                result.add(this.executionFactory.retrieveValue(ClobType.class, JsonObject.create().put(RESULT, "SUCCESS"))); //$NON-NLS-1$
                 return result;
             }
         }

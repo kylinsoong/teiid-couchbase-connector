@@ -645,6 +645,10 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             return this.name + this.dimension;
         }
         
+        public int dim() {
+            return this.dimension;
+        } 
+        
         @Override
         public int compareTo(Dimension dim) {
             if(this.dimension < dim.dimension) {

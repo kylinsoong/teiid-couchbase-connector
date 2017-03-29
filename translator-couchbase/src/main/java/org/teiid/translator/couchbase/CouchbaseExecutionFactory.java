@@ -289,7 +289,7 @@ public class CouchbaseExecutionFactory extends ExecutionFactory<ConnectionFactor
         return new N1QLVisitor(this);
     }
 
-    public Object retrieveValue(String columnName, Class<?> columnType, Object value) {
+    public Object retrieveValue(Class<?> columnType, Object value) {
         
         if (value == null) {
             return null;

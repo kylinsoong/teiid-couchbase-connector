@@ -22,8 +22,10 @@
 package org.teiid.translator.couchbase;
 
 import static org.teiid.translator.couchbase.CouchbaseProperties.PLACEHOLDER;
+import static org.teiid.translator.couchbase.CouchbaseProperties.IDX_SUFFIX;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -36,6 +38,7 @@ import org.teiid.translator.DataNotAvailableException;
 import org.teiid.translator.ExecutionContext;
 import org.teiid.translator.ResultSetExecution;
 import org.teiid.translator.TranslatorException;
+import org.teiid.translator.couchbase.CouchbaseMetadataProcessor.Dimension;
 
 import com.couchbase.client.java.document.json.JsonArray;
 import com.couchbase.client.java.document.json.JsonObject;
@@ -49,10 +52,9 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
 	
 	private N1QLVisitor visitor;
 	private Iterator<N1qlQueryRow> results;
-	private Iterator <Object> array;
-	private List<Object> arrayRow;
-	private List<String> arrayColumnNames;
-
+	
+	private Iterator<List<?>> arrayResults;
+	
 	public CouchbaseQueryExecution(
 			CouchbaseExecutionFactory executionFactory,
 			QueryExpression command, ExecutionContext executionContext,
@@ -75,11 +77,12 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
 	@Override
 	public List<?> next() throws TranslatorException, DataNotAvailableException {
 	    
-	    if (this.results != null && this.results.hasNext() && this.array == null) {
+	    if (this.results != null && this.results.hasNext() && this.arrayResults == null) {
 	        N1qlQueryRow queryRow = this.results.next();
 	        if(queryRow != null) {
 	            List<Object> row = new ArrayList<>(expectedTypes.length);
 	            JsonObject json = queryRow.value();
+	            
 	            for(int i = 0 ; i < expectedTypes.length ; i ++){
 	                String columnName = null;
 	                Object value = null;
@@ -103,71 +106,176 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
 	                    value = json.get(columnName);
 	                }
 	                
-	                if(value instanceof JsonArray) {
-	                    array = ((JsonArray)value).iterator();
-	                    this.arrayRow = row;
-	                    this.arrayColumnNames = this.visitor.getSelectColumns().subList(i +1, this.visitor.getSelectColumns().size());
+	                //handle json array
+	                if(value == null && columnName.equals(IDX_SUFFIX) && expectedTypes[i].equals(Integer.class)) {
+	                    List<String> arrayColumnNames = this.visitor.getSelectColumns().subList(i, this.visitor.getSelectColumns().size());
+	                    List<String> arrayColumnReferences = this.visitor.getSelectColumnReferences().subList(i, this.visitor.getSelectColumnReferences().size());
+	                    arrayResults = new JsonArrayMatrixResult(row.get(0), arrayColumnNames, arrayColumnReferences, json).iterator();
 	                    return nextArray();
 	                }
-	                row.add(this.executionFactory.retrieveValue(columnName, expectedTypes[i], value));
+	                
+	                row.add(this.executionFactory.retrieveValue(expectedTypes[i], value));
 	            }
 	            return row;
 	        }
-	    } else if(this.array != null && this.array.hasNext()) {
+	    } else if(this.arrayResults != null) {
 	        return nextArray();
 	    }
 		return null;
 	}
 
-	private List<?> nextArray() {
-	    if(this.array != null && this.array.hasNext()){
-	        
-	        List<Object> row = new ArrayList<>();
-	        row.addAll(this.arrayRow);
-	        Object obj = this.array.next();
-	        JsonObject json = null;
-	        boolean isAddObject = true;
-	        
-	        if(obj instanceof JsonObject) {
-	            json = (JsonObject) obj;
-	        }
-	        
-	        for(int i = 1; i < expectedTypes.length ; i ++) {
-	            String columnName = arrayColumnNames.get(i - 1);
-	            if(json != null) {
-                    row.add(this.executionFactory.retrieveValue(columnName, expectedTypes[i], json.get(columnName)));
-                } else if(isAddObject){
-                    row.add(this.executionFactory.retrieveValue(columnName, expectedTypes[i], obj));
-                    isAddObject = false;
-                } else {
-                    row.add(this.executionFactory.retrieveValue(columnName, expectedTypes[i], null));
-                }
-	        }
-
-            if(!this.array.hasNext()) {
-                this.array = null;
-                this.arrayRow = null;
-                this.arrayColumnNames = null;
-            }
-            return row;
+	private List<?> nextArray() throws DataNotAvailableException, TranslatorException {      
+	    if(this.arrayResults != null && this.arrayResults.hasNext()) {
+	        return this.arrayResults.next();
+	    } else if (this.results != null && this.results.hasNext()) {
+	        this.arrayResults = null;
+	        return this.next();
 	    }
         return null;
     }
-	
-	private String buildPlaceholder(int i) {
+
+    private String buildPlaceholder(int i) {
         return PLACEHOLDER + i; 
     }
 
     @Override
 	public void close() {
 	    this.results = null;
-	    this.array = null;
-        this.arrayRow = null;
-        this.arrayColumnNames = null;
+	    this.arrayResults = null;
 	}
 
 	@Override
 	public void cancel() throws TranslatorException {
 		close();
+	}
+	
+	private class JsonArrayMatrixResult implements Iterable<List<?>> {
+	    
+	    private final Object documentId;
+	    private JsonArray jsonArray;
+	    
+	    List<List<?>> allRow = new ArrayList<>();
+	    
+	    public JsonArrayMatrixResult(Object documentId, List<String> columnNames, List<String> columnReferences, JsonObject json) throws TranslatorException {
+	        this.documentId = documentId;
+	        this.jsonArray = findArray(json, columnNames, columnReferences);
+	        buildMatrix(columnNames, columnReferences);
+	    }
+
+        private void buildMatrix(List<String> columnNames, List<String> columnReferences) throws TranslatorException {
+
+            List<Object> items = jsonArray.toList();
+            for(int i = 0 ; i < items.size() ; i ++){
+                Object item = items.get(i);
+                Object[] row = new Object[expectedTypes.length];
+                row[0] = this.documentId;
+                retrive(i, item, row, columnNames, columnReferences, new Dimension());
+                allRow.add(Arrays.asList(row));
+            }
+        }
+
+        private void retrive(int index, Object item, Object[] row, List<String> columnNames, List<String> columnReferences, Dimension dimension) throws TranslatorException {
+
+            dimension.increment();
+            setValue(row, index, columnNames);
+            
+            Class<?>[] expectedValueTypes = Arrays.copyOfRange(expectedTypes, dimension.dim() + 1, expectedTypes.length);
+            List<String> columnValueNames = columnNames.subList(dimension.dim(), columnNames.size());
+            List<String> columnValueReferences = columnReferences.subList(dimension.dim(), columnReferences.size());
+            
+            if(expectedValueTypes.length != columnValueNames.size()) {
+                throw new TranslatorException(CouchbasePlugin.Event.TEIID29016, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29016, expectedTypes.length, columnNames.size(), columnNames, item));
+            }
+            
+            if(item instanceof JsonArray) {
+                
+                JsonArray array = (JsonArray) item;
+                List<Object> subItems = array.toList();
+                for(int i = 0 ; i < subItems.size() ; i ++) {
+                    Object subItem = subItems.get(i);
+                 // TODO
+                    retrive(i, subItem, row, columnNames, columnReferences, dimension);
+                }
+            } else {
+                boolean isAddNoNested = true;
+                boolean isJsonObject = (item instanceof JsonObject);
+                JsonObject json = null;
+                if(isJsonObject) {
+                    json = (JsonObject) item;
+                }
+                for(int i = 0 ; i < expectedValueTypes.length ; i ++) {
+                    if(isJsonObject) {
+                        String columnName = columnValueNames.get(i);
+                        Object value = json.get(columnName);
+                        if(value == null && columnValueReferences.get(i) != null) {
+                            value = json.get(columnValueReferences.get(i));
+                        }
+                        setValue(row, executionFactory.retrieveValue(expectedValueTypes[i], value), columnNames);
+                    } else if(isAddNoNested && !isJsonObject){
+                        setValue(row, executionFactory.retrieveValue(expectedValueTypes[i], item), columnNames);
+                        isAddNoNested = false;
+                    } else {
+                        setValue(row, executionFactory.retrieveValue(expectedValueTypes[i], null), columnNames);
+                    }
+                }
+            }   
+        }
+
+        private void setValue(Object[] row, Object item, List<String> columnNames) throws TranslatorException {
+            boolean success = false;
+            for(int i = 0 ; i < row.length ; i ++) {
+                if(row[i] == null){
+                    row[i] = item;
+                    success = true;
+                    break;
+                }
+            }
+            if(!success) {
+                throw new TranslatorException(CouchbasePlugin.Event.TEIID29015, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29015, expectedTypes.length, columnNames, item));
+            }
+        }
+
+        private JsonArray findArray(JsonObject json, List<String> columnNames, List<String> columnReferences) throws TranslatorException {
+            
+            JsonArray result = null;
+            
+            for(String columnName : columnNames) {
+                if(columnName != null && columnName.endsWith(IDX_SUFFIX)) {
+                    continue;
+                } else if(columnName != null && json.getNames().contains(columnName)) {
+                    Object value = json.get(columnName);
+                    if(value != null && value instanceof JsonArray) {
+                        result = (JsonArray) value;
+                        break;
+                    }
+                }
+            }
+            
+            if(result != null) {
+                return result;
+            }
+            
+            for(String referenceName : columnReferences) {
+                if(referenceName != null && json.getNames().contains(referenceName)) {
+                    Object value = json.get(referenceName);
+                    if(value != null && value instanceof JsonArray) {
+                        result = (JsonArray) value;
+                        break;
+                    }
+                }
+            }
+            
+            if(result != null) {
+                return result;
+            }
+            
+            throw new TranslatorException(CouchbasePlugin.Event.TEIID29014, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29014, json, columnNames));
+        }
+
+        @Override
+        public Iterator<List<?>> iterator() {
+            return allRow.iterator();
+        }
+	    
 	}
 }
