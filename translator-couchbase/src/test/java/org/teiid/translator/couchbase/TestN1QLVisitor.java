@@ -92,7 +92,6 @@ public class TestN1QLVisitor {
         Command command = translationUtility.parseCommand(sql);
 
         N1QLVisitor visitor = TRANSLATOR.getN1QLVisitor();
-        visitor.setKeySpace(KEYSPACE);
         visitor.append(command);
 
         System.out.println(visitor.toString());
@@ -282,33 +281,30 @@ public class TestN1QLVisitor {
     
     @Test
     public void testProcedures() throws TranslatorException {
-        
-        String sql = "call getTextDocuments('customer')";
-        helpTest(sql, "SELECT META().id AS id, result FROM `test` AS result WHERE META().id LIKE 'customer'");
-        
-        sql = "call getTextDocuments('%e%')";
+       
+        String sql = "call getTextDocuments('%e%', 'test')";
         helpTest(sql, "SELECT META().id AS id, result FROM `test` AS result WHERE META().id LIKE '%e%'");
         
-        sql = "call getDocuments('customer')";
+        sql = "call getDocuments('customer', 'test')";
         helpTest(sql, "SELECT result FROM `test` AS result WHERE META().id LIKE 'customer'");
         
-        sql = "call getTextDocument('customer')";
+        sql = "call getTextDocument('customer', 'test')";
         helpTest(sql, "SELECT META().id AS id, result FROM `test` AS result USE PRIMARY KEYS 'customer'");
         
-        sql = "call getDocument('customer')";
+        sql = "call getDocument('customer', 'test')";
         helpTest(sql, "SELECT result FROM `test` AS result USE PRIMARY KEYS 'customer'");
         
-        sql = "call saveDocument('k001', '{\"key\": \"value\"}')";
-        helpTest(sql, "UPSERT INTO `test` AS result (KEY, VALUE) VALUES ('k001', '{\"key\": \"value\"}')");
+        sql = "call saveDocument('k001', 'test', '{\"key\": \"value\"}')";
+        helpTest(sql, "UPSERT INTO `test` (KEY, VALUE) VALUES ('k001', '{\"key\": \"value\"}')");
         
-        sql = "call deleteDocument('k001')";
-        helpTest(sql, "DELETE FROM `test` AS result USE PRIMARY KEYS 'k001' RETURNING result");
+        sql = "call deleteDocument('k001', 'test')";
+        helpTest(sql, "DELETE FROM `test` USE PRIMARY KEYS 'k001'");
         
-        sql = "call getTextMetadataDocument()";
-        helpTest(sql, "SELECT META() AS result FROM `test`");
+        sql = "call getTextMetadataDocument('test')";
+        helpTest(sql, "SELECT META(`test`) AS result FROM `test`");
         
-        sql = "call getMetadataDocument()";
-        helpTest(sql, "SELECT META() AS result FROM `test`");
+        sql = "call getMetadataDocument('test')";
+        helpTest(sql, "SELECT META(`test`) AS result FROM `test`");
     }
    
 

@@ -357,93 +357,80 @@ public class N1QLVisitor extends SQLStringVisitor{
     public List<String> getSelectColumnReferences() {
         return selectColumnReferences;
     }
-    
-    private String keySpace;
-
-    public String getKeySpace() {
-        return keySpace;
-    }
-
-    public void setKeySpace(String keySpace) {
-        this.keySpace = keySpace;
-    }
 
     @Override
     public void visit(Call call) {
+        
+        String procName = call.getProcedureName();
+        String keyspace = null;
+        if(procName.equalsIgnoreCase(GETTEXTDOCUMENTS) || procName.equalsIgnoreCase(GETTEXTDOCUMENT) || procName.equalsIgnoreCase(GETDOCUMENTS) || procName.equalsIgnoreCase(GETDOCUMENT) || procName.equalsIgnoreCase(SAVEDOCUMENT) || procName.equalsIgnoreCase(DELETEDOCUMENT)) {
+            keyspace = (String) call.getArguments().get(1).getArgumentValue().getValue();
+        } else if(procName.equalsIgnoreCase(GETTEXTMETADATADOCUMENT) || procName.equalsIgnoreCase(GETMETADATADOCUMENT)) {
+            keyspace = (String) call.getArguments().get(0).getArgumentValue().getValue();
+        }
                 
         if(call.getProcedureName().equalsIgnoreCase(GETTEXTDOCUMENTS)) {
-            appendClobN1QL();
+            appendClobN1QL(keyspace);
             appendN1QLWhere(call);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(GETTEXTDOCUMENT)) {
-            appendClobN1QL();
+            appendClobN1QL(keyspace);
             appendN1QLPK(call);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(GETDOCUMENTS)) {
-            appendBlobN1QL();
+            appendBlobN1QL(keyspace);
             appendN1QLWhere(call);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(GETDOCUMENT)) {
-            appendBlobN1QL();
+            appendBlobN1QL(keyspace);
             appendN1QLPK(call);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(SAVEDOCUMENT)) {
             buffer.append("UPSERT INTO").append(SPACE); //$NON-NLS-1$
-            buffer.append(nameInSource(keySpace)).append(SPACE);
-            buffer.append(Reserved.AS).append(SPACE);
-            buffer.append(RESULT).append(SPACE); 
+            buffer.append(nameInSource(keyspace)).append(SPACE); 
             buffer.append("(KEY, VALUE) VALUES").append(SPACE); //$NON-NLS-1$
             buffer.append(LPAREN);
-            final List<Argument> params = call.getArguments();
-            for (int i = 0; i < params.size(); i++) {
-                Argument param = params.get(i);
-                if (param.getDirection() == Direction.IN ) {
-                    if (i != 0) {
-                        buffer.append(COMMA).append(SPACE);
-                    }
-                    append(param);
-                }
-            }
+            append(call.getArguments().get(0));
+            buffer.append(COMMA).append(SPACE);
+            append(call.getArguments().get(2));
             buffer.append(RPAREN);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(DELETEDOCUMENT)) {
             buffer.append(Reserved.DELETE).append(SPACE);
             buffer.append(Reserved.FROM).append(SPACE);
-            buffer.append(nameInSource(keySpace)).append(SPACE);
-            buffer.append(Reserved.AS).append(SPACE);
-            buffer.append(RESULT).append(SPACE); 
+            buffer.append(nameInSource(keyspace)).append(SPACE);
             appendN1QLPK(call);
-            buffer.append(SPACE);
-            buffer.append("RETURNING").append(SPACE); //$NON-NLS-1$
-            buffer.append(RESULT);
             return;
         } else if(call.getProcedureName().equalsIgnoreCase(GETTEXTMETADATADOCUMENT) || call.getProcedureName().equalsIgnoreCase(GETMETADATADOCUMENT)) {
             buffer.append(SELECT).append(SPACE);
-            buffer.append("META").append(LPAREN).append(RPAREN).append(SPACE); //$NON-NLS-1$
+            buffer.append("META").append(LPAREN);
+            buffer.append(nameInSource(keyspace));
+            buffer.append(RPAREN).append(SPACE); //$NON-NLS-1$
             buffer.append(Reserved.AS).append(SPACE);
             buffer.append(RESULT).append(SPACE);
             buffer.append(Reserved.FROM).append(SPACE);
-            buffer.append(nameInSource(keySpace));
+            buffer.append(nameInSource(keyspace));
             return;
         } 
     }
 
-    private void appendClobN1QL() {
+    private void appendClobN1QL(String keyspace) {
         buffer.append(SELECT).append(SPACE);
         buffer.append("META").append(LPAREN).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$ //$NON-NLS-2$
         buffer.append(Reserved.AS).append(SPACE).append(ID); 
         buffer.append(COMMA).append(SPACE); 
-        buffer.append(RESULT).append(SPACE); 
-        buffer.append(Reserved.FROM).append(SPACE);
-        buffer.append(nameInSource(keySpace)).append(SPACE);
-        buffer.append(Reserved.AS).append(SPACE).append(RESULT).append(SPACE);
+        appendFromKeyspace(keyspace);
     }
     
-    private void appendBlobN1QL() {
+    private void appendBlobN1QL(String keyspace) {
         buffer.append(SELECT).append(SPACE);
+        appendFromKeyspace(keyspace);
+    }
+    
+    private void appendFromKeyspace(String keyspace) {
         buffer.append(RESULT).append(SPACE); 
         buffer.append(Reserved.FROM).append(SPACE);
-        buffer.append(nameInSource(keySpace)).append(SPACE);
+        buffer.append(nameInSource(keyspace)).append(SPACE);
         buffer.append(Reserved.AS).append(SPACE).append(RESULT).append(SPACE);
     }
     

@@ -37,9 +37,6 @@ public interface CouchbaseProperties {
     String TRUE_VALUE = "true"; //$NON-NLS-1$
     String FALSE_VALUE = "false"; //$NON-NLS-1$
     
-    String ID = "id"; //$NON-NLS-1$
-    String RESULT = "result"; //$NON-NLS-1$
-    
     String DEFAULT_NAMESPACE = "default"; //$NON-NLS-1$
     String DEFAULT_TYPENAME = "type"; //$NON-NLS-1$
     String TPYENAME_MATCHER_PATTERN = "([a-zA-Z_]\\w*|(?:`[^`]*`)+):([a-zA-Z_]\\w*|(?:`[^`]*`)+)(?:$|,)"; //$NON-NLS-1$
@@ -47,6 +44,7 @@ public interface CouchbaseProperties {
     String NAME = "name"; //$NON-NLS-1$
     String DOCUMENTID = "_documentId"; //$NON-NLS-1$
     
+    // Procedure Name
     String GETTEXTDOCUMENTS = "getTextDocuments"; //$NON-NLS-1$
     String GETDOCUMENTS = "getDocuments"; //$NON-NLS-1$
     String GETTEXTDOCUMENT = "getTextDocument"; //$NON-NLS-1$
@@ -55,5 +53,11 @@ public interface CouchbaseProperties {
     String DELETEDOCUMENT = "deleteDocument"; //$NON-NLS-1$
     String GETMETADATADOCUMENT  = "getMetadataDocument"; //$NON-NLS-1$
     String GETTEXTMETADATADOCUMENT  = "getTextMetadataDocument"; //$NON-NLS-1$
+    
+    // Procedure Parameter Name
+    String ID = "id"; //$NON-NLS-1$
+    String RESULT = "result"; //$NON-NLS-1$
+    String KEYSPACE = "keyspace"; //$NON-NLS-1$
+    String DOCUMENT = "document"; //$NON-NLS-1$
 
 }

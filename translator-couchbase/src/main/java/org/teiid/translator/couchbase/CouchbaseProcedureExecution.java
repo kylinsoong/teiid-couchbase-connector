@@ -120,9 +120,8 @@ public class CouchbaseProcedureExecution extends CouchbaseExecution implements P
                 result.add(value);
                 return result;
             } else if(procName.equalsIgnoreCase(SAVEDOCUMENT) || procName.equalsIgnoreCase(DELETEDOCUMENT)) {
-                JsonObject json = row.value();
                 ArrayList<Object> result = new ArrayList<>(1);
-                result.add(this.executionFactory.retrieveValue(RESULT, ClobType.class, json.get(RESULT)));
+                result.add(this.executionFactory.retrieveValue(RESULT, ClobType.class, JsonObject.create().put(RESULT, "SUCCESS"))); //$NON-NLS-1$
                 return result;
             }
         }
