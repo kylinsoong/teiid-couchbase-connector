@@ -42,7 +42,7 @@ public interface CouchbaseProperties {
     String TPYENAME_MATCHER_PATTERN = "([a-zA-Z_]\\w*|(?:`[^`]*`)+):([a-zA-Z_]\\w*|(?:`[^`]*`)+)(?:$|,)"; //$NON-NLS-1$
 
     String NAME = "name"; //$NON-NLS-1$
-    String DOCUMENTID = "_documentId"; //$NON-NLS-1$
+    String DOCUMENTID = "documentID"; //$NON-NLS-1$
     
     // Procedure Name
     String GETTEXTDOCUMENTS = "getTextDocuments"; //$NON-NLS-1$
