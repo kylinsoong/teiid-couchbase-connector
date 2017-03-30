@@ -48,7 +48,6 @@ import static org.teiid.translator.couchbase.CouchbaseProperties.ID;
 import static org.teiid.translator.couchbase.CouchbaseProperties.RESULT;
 import static org.teiid.translator.couchbase.CouchbaseProperties.KEYSPACE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENT;
-
 import static org.teiid.metadata.BaseColumn.NullType.*;
 
 import java.math.BigDecimal;
@@ -265,7 +264,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
                 if(isObjectJsonType(columnValue)) { 
                     scanRow(newKey, newKeyInSource, jsonValue, mf, table, referenceTableName, true, dimension);
                 } else if(isArrayJsonType(columnValue)) {
-                    String tableName = buildArrayTableName(table.getName(), newKey);
+                    String tableName = repleaceTypedName(table.getName(), newKey);
                     String tableNameInSource = newKeyInSource + SQUARE_BRACKETS ;
                     Table subTable = addTable(tableName, tableNameInSource, true, referenceTableName, dimension, mf);
                     scanRow(newKey, newKeyInSource, jsonValue, mf, subTable, referenceTableName, true, dimension);
@@ -350,11 +349,16 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
             table.setProperty(IS_ARRAY_TABLE, TRUE_VALUE);
             mf.addColumn(DOCUMENTID, STRING, table);
             mf.addForiegnKey("FK0", Arrays.asList(DOCUMENTID), referenceTableName, table); //$NON-NLS-1$
-            Column idx = mf.addColumn(tableName + IDX_SUFFIX, INTEGER, table);
-            idx.setUpdatable(false);
+            
+            for(int i = 1 ; i <= dimension.dimension ; i ++) {
+                String idxName = buildArrayTableIdxName(nameInSource, i);
+                idxName = repleaceTypedName(referenceTableName, idxName);
+                Column idx = mf.addColumn(idxName, INTEGER, table);
+                idx.setUpdatable(false);
+            }
             dimension.increment();
         } 
-        
+     
         return table;
     }
 
@@ -408,9 +412,35 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
      * @param path - path of document
      * @return
      */
-    private String buildArrayTableName(String name, String path) {
+    private String repleaceTypedName(String name, String path) {
         String tableName = path.substring(path.indexOf(UNDERSCORE));
         return name + tableName;
+    }
+    
+    private String buildArrayTableIdxName(String nameInSource, int dimension) {
+        StringBuilder sb = new StringBuilder();
+        String dim1Name = nameInSource.substring(0, nameInSource.indexOf(SQUARE_BRACKETS));
+        String[] names = dim1Name.split(Pattern.quote(SOURCE_SEPARATOR));
+        boolean isFirst = true;
+        for(String name : names) {
+            if(isFirst) {
+                isFirst = false;
+                sb.append(this.trimWave(name));
+            } else {
+                sb.append(UNDERSCORE);
+                sb.append(this.trimWave(name));
+            }
+        }
+
+        for(int i = 1 ; i <= dimension ; i ++) {
+            if(i == 1) {
+                continue;
+            }
+            sb.append(UNDERSCORE);
+            sb.append(DIM_SUFFIX).append(i);
+        }
+        sb.append(IDX_SUFFIX);
+        return sb.toString();
     }
     
     private String buildNamedTypePair(String columnIdentifierName, String typedValue) {
@@ -627,6 +657,30 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
         this.typeNameList = typeNameList;
     }
     
+    /**
+     * The dimension of nested array, a dimension is a hint of nested array table name, and index name.
+     * 
+     * For example, the following JsonObject is a 3 dimension nested array,
+     * <pre> {@code
+     *  {
+     *    "default": {"nested": [[["dimension 3"]]]}
+     *  }
+     * }</pre>
+     * each dimension reference with a table, total 3 tables will be generated: 
+     *   default_nested
+     *   default_nested_dim2
+     *   default_nested_dim2_dim3
+     *   
+     * The nested array contains it's index of it's parent array, the return of query
+     * 'SELECT * FROM default_nested_dim2_dim3' looks
+     * <pre> {@code
+     *  +-------------+--------------------+-------------------------+------------------------------+--------------------------+
+     *  |     ID      | default_nested_idx | default_nested_dim2_idx | default_nested_dim2_dim3_idx | default_nested_dim2_dim3 |
+     *  +-------------+--------------------+-------------------------+------------------------------+--------------------------+
+     *  | nestedArray | 0                  | 0                       | 0                            | dimension 3              |
+     *  +-------------+--------------------+-------------------------+------------------------------+--------------------------+
+     *}</pre>
+     */
     public static class Dimension implements Comparable<Dimension> {
         
         private final String name;
@@ -634,7 +688,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
         
         public Dimension() {
             this.name = DIM_SUFFIX ;
-            this.dimension = 0;
+            this.dimension = 1;
         }
         
         public void increment() {

@@ -218,7 +218,6 @@ public class N1QLVisitor extends SQLStringVisitor{
             String group = obj.getTable().getCorrelationName();
             String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false);
       
-            
             if(obj.getName().equals(DOCUMENTID)) {
                 if(recordColumnName) {
                     buffer.append("META().id").append(SPACE).append(Reserved.AS).append(SPACE).append(PK); //$NON-NLS-1$ 
@@ -262,7 +261,7 @@ public class N1QLVisitor extends SQLStringVisitor{
                         }
                         if(!this.arrayTables.contains(groupName)) {
                             this.arrayTables.add(groupName);
-                            this.selectColumns.add(groupName);
+                            this.selectColumns.add(trimWave(groupName));
                             buffer.append(groupName);
                             this.isNestedJsonInArrayColumn = true;
                         }

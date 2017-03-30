@@ -108,9 +108,7 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
 	                
 	                //handle json array
 	                if(value == null && columnName.equals(IDX_SUFFIX) && expectedTypes[i].equals(Integer.class)) {
-	                    List<String> arrayColumnNames = this.visitor.getSelectColumns().subList(i, this.visitor.getSelectColumns().size());
-	                    List<String> arrayColumnReferences = this.visitor.getSelectColumnReferences().subList(i, this.visitor.getSelectColumnReferences().size());
-	                    arrayResults = new JsonArrayMatrixResult(row.get(0), arrayColumnNames, arrayColumnReferences, json).iterator();
+	                    arrayResults = new JsonArrayMatrixResult(row.get(0), this.visitor.getSelectColumns(), this.visitor.getSelectColumnReferences(), json).iterator();
 	                    return nextArray();
 	                }
 	                
@@ -137,7 +135,8 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
     private String buildPlaceholder(int i) {
         return PLACEHOLDER + i; 
     }
-
+    
+    
     @Override
 	public void close() {
 	    this.results = null;
@@ -164,9 +163,8 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
 
         private void buildMatrix(List<String> columnNames, List<String> columnReferences) throws TranslatorException {
 
-            List<Object> items = jsonArray.toList();
-            for(int i = 0 ; i < items.size() ; i ++){
-                Object item = items.get(i);
+            for(int i = 0 ; i < jsonArray.size() ; i ++){
+                Object item = jsonArray.get(i);
                 Object[] row = new Object[expectedTypes.length];
                 row[0] = this.documentId;
                 retrive(i, item, row, columnNames, columnReferences, new Dimension());
@@ -177,6 +175,15 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
         private void retrive(int index, Object item, Object[] row, List<String> columnNames, List<String> columnReferences, Dimension dimension) throws TranslatorException {
 
             dimension.increment();
+            
+            for(int i = 0 ; i < expectedTypes.length ; i ++) {
+                if(i == 0) {
+                    setValue(row, this.documentId, i, columnNames);
+                } else if (columnNames.get(i).endsWith(IDX_SUFFIX)) {
+                    setValue(row, index, i, columnNames);
+                }
+            }
+            
             setValue(row, index, columnNames);
             
             Class<?>[] expectedValueTypes = Arrays.copyOfRange(expectedTypes, dimension.dim() + 1, expectedTypes.length);
@@ -233,6 +240,15 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
             if(!success) {
                 throw new TranslatorException(CouchbasePlugin.Event.TEIID29015, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29015, expectedTypes.length, columnNames, item));
             }
+        }
+        
+        private void setValue(Object[] row, Object item, int index, List<String> columnNames) throws TranslatorException {
+            
+            if(index >= row.length) {
+                throw new TranslatorException(CouchbasePlugin.Event.TEIID29015, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29015, expectedTypes.length, columnNames, item));
+            }
+            
+            row[index] = item;
         }
 
         private JsonArray findArray(JsonObject json, List<String> columnNames, List<String> columnReferences) throws TranslatorException {

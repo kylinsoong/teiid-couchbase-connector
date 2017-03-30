@@ -306,6 +306,13 @@ public class TestN1QLVisitor {
         sql = "call getMetadataDocument('test')";
         helpTest(sql, "SELECT META(`test`) AS result FROM `test`");
     }
+    
+    @Test
+    public void testNameInSource() throws TranslatorException {
+        
+        String sql = "SELECT * FROM Oder_Items";
+        helpTest(sql, "SELECT META().id AS PK, `Items` FROM `test`.`Items`");
+    }
    
 
 }
