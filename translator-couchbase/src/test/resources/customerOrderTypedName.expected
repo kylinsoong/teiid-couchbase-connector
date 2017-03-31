@@ -2,9 +2,9 @@ SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbas
 
 CREATE FOREIGN TABLE Customer (
 	documentID string OPTIONS (UPDATABLE FALSE),
-	ID string OPTIONS (NAMEINSOURCE '`ID`'),
-	type string OPTIONS (NAMEINSOURCE '`type`'),
-	Name string OPTIONS (NAMEINSOURCE '`Name`'),
+	ID string OPTIONS (NAMEINSOURCE '`test`.`ID`'),
+	type string OPTIONS (NAMEINSOURCE '`test`.`type`'),
+	Name string OPTIONS (NAMEINSOURCE '`test`.`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY(documentID)
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false', "teiid_couchbase:NAMEDTYPEPAIR" '`type` = ''Customer''');
 
@@ -17,13 +17,13 @@ CREATE FOREIGN TABLE Customer_SavedAddresses (
 
 CREATE FOREIGN TABLE Oder (
 	documentID string OPTIONS (UPDATABLE FALSE),
-	CustomerID string OPTIONS (NAMEINSOURCE '`CustomerID`'),
-	type string OPTIONS (NAMEINSOURCE '`type`'),
+	CustomerID string OPTIONS (NAMEINSOURCE '`test`.`CustomerID`'),
+	type string OPTIONS (NAMEINSOURCE '`test`.`type`'),
 	CreditCard_CardNumber string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`CardNumber`'),
 	CreditCard_Type string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`Type`'),
 	CreditCard_CVN integer OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`CVN`'),
 	CreditCard_Expiry string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`Expiry`'),
-	Name string OPTIONS (NAMEINSOURCE '`Name`'),
+	Name string OPTIONS (NAMEINSOURCE '`test`.`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY(documentID)
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false', "teiid_couchbase:NAMEDTYPEPAIR" '`type` = ''Oder''');
 

@@ -2,10 +2,10 @@ SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbas
 
 CREATE FOREIGN TABLE test (
 	documentID string OPTIONS (UPDATABLE FALSE),
-	ID string OPTIONS (NAMEINSOURCE '`ID`'),
-	type string OPTIONS (NAMEINSOURCE '`type`'),
-	Name string OPTIONS (NAMEINSOURCE '`Name`'),
-	CustomerID string OPTIONS (NAMEINSOURCE '`CustomerID`'),
+	ID string OPTIONS (NAMEINSOURCE '`test`.`ID`'),
+	type string OPTIONS (NAMEINSOURCE '`test`.`type`'),
+	Name string OPTIONS (NAMEINSOURCE '`test`.`Name`'),
+	CustomerID string OPTIONS (NAMEINSOURCE '`test`.`CustomerID`'),
 	CreditCard_CardNumber string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`CardNumber`'),
 	CreditCard_Type string OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`Type`'),
 	CreditCard_CVN integer OPTIONS (NAMEINSOURCE '`test`.`CreditCard`.`CVN`'),

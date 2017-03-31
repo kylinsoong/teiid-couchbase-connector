@@ -2,7 +2,7 @@ SET NAMESPACE 'http://www.teiid.org/translator/couchbase/2017' AS teiid_couchbas
 
 CREATE FOREIGN TABLE test (
 	documentID string OPTIONS (UPDATABLE FALSE),
-	Name string OPTIONS (NAMEINSOURCE '`Name`'),
+	Name string OPTIONS (NAMEINSOURCE '`test`.`Name`'),
 	CONSTRAINT PK0 PRIMARY KEY(documentID)
 ) OPTIONS (NAMEINSOURCE '`test`', UPDATABLE TRUE, "teiid_couchbase:ISARRAYTABLE" 'false');
 

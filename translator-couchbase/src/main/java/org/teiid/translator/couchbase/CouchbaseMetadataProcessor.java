@@ -270,11 +270,10 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
                     scanRow(newKey, newKeyInSource, jsonValue, mf, subTable, referenceTableName, true, dimension);
                 }
             } else {
-                String columnNameInSource = nameInSource(name);
                 if(isNestedType) {
                     columnName = key + UNDERSCORE + columnName;
-                    columnNameInSource = keyInSource + SOURCE_SEPARATOR + columnNameInSource;
                 }
+                String columnNameInSource = keyInSource + SOURCE_SEPARATOR +nameInSource(name);
                 addColumn(columnName, columnType, columnValue, true, columnNameInSource, table, mf);
             }
         } 
