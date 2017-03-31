@@ -69,6 +69,7 @@ public class CouchbaseQueryExecution extends CouchbaseExecution implements Resul
 		this.visitor = this.executionFactory.getN1QLVisitor();
 		this.visitor.append(this.command);
 		String sql = this.visitor.toString();
+		System.out.println(sql); //TODO
 		LogManager.logDetail(LogConstants.CTX_CONNECTOR, CouchbasePlugin.Util.gs(CouchbasePlugin.Event.TEIID29001, sql));
 		N1qlQueryResult queryResult = connection.executeQuery(sql);
 		this.results = queryResult.iterator();
