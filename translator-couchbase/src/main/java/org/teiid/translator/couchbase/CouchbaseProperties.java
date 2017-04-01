@@ -37,6 +37,10 @@ public interface CouchbaseProperties {
     String TRUE_VALUE = "true"; //$NON-NLS-1$
     String FALSE_VALUE = "false"; //$NON-NLS-1$
     
+    String UNNEST = "UNNEST"; //$NON-NLS-1$
+    String UNNEST_POSITION = "UNNEST_POSITION"; //$NON-NLS-1$
+    String LET = "LET"; //$NON-NLS-1$
+    
     String DEFAULT_NAMESPACE = "default"; //$NON-NLS-1$
     String DEFAULT_TYPENAME = "type"; //$NON-NLS-1$
     String TPYENAME_MATCHER_PATTERN = "([a-zA-Z_]\\w*|(?:`[^`]*`)+):([a-zA-Z_]\\w*|(?:`[^`]*`)+)(?:$|,)"; //$NON-NLS-1$
