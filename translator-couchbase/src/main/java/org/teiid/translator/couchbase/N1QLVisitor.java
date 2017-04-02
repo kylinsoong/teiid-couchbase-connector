@@ -31,6 +31,7 @@ import static org.teiid.language.SQLConstants.Reserved.OFFSET;
 import static org.teiid.language.SQLConstants.Reserved.SELECT;
 import static org.teiid.language.SQLConstants.Reserved.WHERE;
 import static org.teiid.language.SQLConstants.Tokens.COMMA;
+import static org.teiid.language.SQLConstants.Tokens.COLON;
 import static org.teiid.language.SQLConstants.Tokens.SPACE;
 import static org.teiid.language.SQLConstants.Tokens.LPAREN;
 import static org.teiid.language.SQLConstants.Tokens.RPAREN;
@@ -80,7 +81,6 @@ import org.teiid.language.SQLConstants.NonReserved;
 import org.teiid.language.SQLConstants.Reserved;
 import org.teiid.language.SQLConstants.Tokens;
 import org.teiid.language.Select;
-import org.teiid.language.TableReference;
 import org.teiid.language.visitor.SQLStringVisitor;
 
 public class N1QLVisitor extends SQLStringVisitor{
@@ -93,12 +93,15 @@ public class N1QLVisitor extends SQLStringVisitor{
     private Map<String, CBColumn> columnMap = new HashMap<>();
     
     private AliasGenerator columnAliasGenerator;
-    private String tableAlias;
+    private AliasGenerator tableAliasGenerator;
     
     private boolean isArrayTable = false;
     private List<CBColumn> unnestStack = new ArrayList<>();
     
-    private String typedNamePair = null;
+    private String typedName = null;
+    private String typedValue = null;
+    private List<CBColumn> typedWhere = new ArrayList<>();
+    private boolean isWhereClause = false;
     
 
     public N1QLVisitor(CouchbaseExecutionFactory ef) {
@@ -108,9 +111,6 @@ public class N1QLVisitor extends SQLStringVisitor{
     @Override
     public void visit(Select obj) {
         
-        this.columnAliasGenerator = new AliasGenerator(N1QL_COLUMN_ALIAS_PREFIX);
-        this.tableAlias = new AliasGenerator(N1QL_TABLE_ALIAS_PREFIX).generate();
-
         buffer.append(SELECT).append(Tokens.SPACE);
         if (obj.isDistinct()) {
             buffer.append(DISTINCT).append(Tokens.SPACE);
@@ -155,7 +155,7 @@ public class N1QLVisitor extends SQLStringVisitor{
             boolean comma = false;
             for(int i = 0 ; i < this.unnestStack.size() ; i++) {
                 if (comma) {
-                    buffer.append(COMMA);
+                    buffer.append(COMMA).append(SPACE);
                 }
                 comma = true;
                 buffer.append(this.unnestStack.get(i).getValueReference());
@@ -166,48 +166,43 @@ public class N1QLVisitor extends SQLStringVisitor{
     private void appendWhere(Select obj) {
 
         recordColumnName = false;
-        List<String> typedList = getTypedList(obj.getFrom());
-        if (obj.getWhere() != null && typedList.size() == 0) {
+        isWhereClause = true;
+        
+        if (obj.getWhere() != null && this.typedWhere.size() == 0) {
             buffer.append(SPACE).append(WHERE).append(SPACE);
             append(obj.getWhere());
-        } else if (obj.getWhere() != null && typedList.size() > 0) {
+        } else if (obj.getWhere() != null && this.typedWhere.size() > 0) {
             buffer.append(SPACE).append(WHERE).append(SPACE);
             append(obj.getWhere());
-            buffer.append(SPACE).append(Reserved.AND).append(SPACE).append(typedList.get(0));
-        } else if (obj.getWhere() == null && typedList.size() > 0) {
-            buffer.append(SPACE).append(WHERE).append(SPACE).append(typedList.get(0));
+            appendTypedWhere(false);
+        } else if (obj.getWhere() == null && this.typedWhere.size() > 0) {
+            buffer.append(SPACE).append(WHERE).append(SPACE);
+            appendTypedWhere(true);
         }
         recordColumnName = true;
+        isWhereClause = false;
     }
-    
-    private List<String> getTypedList(List<TableReference> references) {
-        
-        List<String> typedName = new ArrayList<>();
-        for(TableReference reference : references) {
-            if(reference instanceof NamedTable) {
-                NamedTable table = (NamedTable) reference;
-                String namePair = table.getMetadataObject().getProperty(NAMED_TYPE_PAIR, false);
-                if(namePair != null && namePair.length() > 2) {
-                    if(this.tableAlias != null) {
-                        typedName.add(nameInSource(tableAlias) + SOURCE_SEPARATOR + namePair);
-                    } else {
-                        typedName.add(namePair);
-                    }
+
+    private void appendTypedWhere(boolean and) {
+        for(CBColumn column : this.typedWhere) {
+            if(column.hasTypedWhere()) {
+                if(and) {
+                    buffer.append(column.getTypedWhere());
+                    and = false;
+                } else {
+                    buffer.append(SPACE).append(Reserved.AND).append(SPACE).append(column.getTypedWhere());
                 }
             }
         }
-
-        return typedName;
     }
 
     @Override
     public void visit(NamedTable obj) {
         
         String tableNameInSource = obj.getMetadataObject().getNameInSource();
+        String alias = getTableAliasGenerator().generate();
         if(this.isArrayTable) {
             String baseName = tableNameInSource;
-            AliasGenerator tableAliasGenerator = new AliasGenerator(N1QL_TABLE_ALIAS_PREFIX);
-            String alias = tableAliasGenerator.generate();
             String newAlias;
             for(int i = this.unnestStack.size() ; i > 0 ; i --) {
                 
@@ -217,8 +212,9 @@ public class N1QLVisitor extends SQLStringVisitor{
                 letValueReference.append(buildEQ(nameReference));
                 
                 if(column.isPK()) {
-                    letValueReference.append("META").append(LPAREN).append(this.nameInSource(alias)).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$ //$NON-NLS-2$
+                    letValueReference.append(buildMeta(alias));
                     column.setValueReference(letValueReference.toString());
+                    column.setTableAlias(alias);
                     continue;
                 } else if (column.isIdx()) {
                     letValueReference.append(UNNEST_POSITION);
@@ -241,10 +237,11 @@ public class N1QLVisitor extends SQLStringVisitor{
                 }
                 
                 letValueReference.append(this.nameInSource(alias));
-                if(column.hasNestedObject()) {
+                if(column.hasLeaf()) {
                     letValueReference.append(SOURCE_SEPARATOR).append(this.nameInSource(column.getLeafName()));
                 }
                 column.setValueReference(letValueReference.toString());
+                column.setTableAlias(alias);
             }
             String keyspace = baseName.substring(0, baseName.indexOf(SOURCE_SEPARATOR));
             buffer.append(keyspace);
@@ -259,10 +256,34 @@ public class N1QLVisitor extends SQLStringVisitor{
                 }
             }
             
-        } else {
-            buffer.append(tableNameInSource);
+        } else {  
+            for(int i = this.unnestStack.size() ; i > 0 ; i --) {
+                CBColumn column = this.unnestStack.get(i -1);
+                String nameReference = column.getNameReference();
+                StringBuilder letValueReference = new StringBuilder();
+                letValueReference.append(buildEQ(nameReference));
+                
+                if(column.isPK()){
+                    buildMeta(alias);
+                    letValueReference.append(buildMeta(alias));
+                    column.setValueReference(letValueReference.toString());
+                    column.setTableAlias(alias);
+                    continue;
+                }
+                
+                letValueReference.append(this.nameInSource(alias));
+                String nameInSource = column.getNameInSource();
+                if(nameInSource != null) {
+                    nameInSource = nameInSource.substring(nameInSource.indexOf(SOURCE_SEPARATOR) + 1, nameInSource.length());
+                    letValueReference.append(SOURCE_SEPARATOR).append(nameInSource);
+                }
+                column.setValueReference(letValueReference.toString());
+                column.setTableAlias(alias);
+            }
+
+            buffer.append(tableNameInSource); // if a table not array table, the table name in source is keyspace name
             buffer.append(SPACE);
-            buffer.append(nameInSource(tableAlias));
+            buffer.append(nameInSource(alias));
         }
     }
 
@@ -270,6 +291,19 @@ public class N1QLVisitor extends SQLStringVisitor{
         StringBuilder sb = new StringBuilder();
         sb.append(this.nameInSource(nameReference));
         sb.append(SPACE).append(EQ).append(SPACE);
+        return sb.toString();
+    }
+    
+    private String buildTypedWhere(String typedName, String typedValue) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(typedName).append(SPACE).append(EQ).append(SPACE);
+        sb.append(typedValue);
+        return sb.toString();
+    }
+    
+    private String buildMeta(String alias) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("META").append(LPAREN).append(nameInSource(alias)).append(RPAREN).append(".id"); //$NON-NLS-1$ //$NON-NLS-2$
         return sb.toString();
     }
 
@@ -312,95 +346,85 @@ public class N1QLVisitor extends SQLStringVisitor{
         
         if(obj.getTable() != null) {
             
-            if(!recordColumnName) {
+            if(!recordColumnName && this.columnMap.get(obj.getName()) != null) {
                 String aliasName = this.columnMap.get(obj.getName()).getNameReference();
                 buffer.append(this.nameInSource(aliasName));
                 return;
             } 
             
-            String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false); 
-            if(isArrayTable.equals(TRUE_VALUE)) {
+            if(!isArrayTable && obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false).equals(TRUE_VALUE)) {
                 this.isArrayTable = true;
             }
-            
-            if(typedNamePair == null) {
-                this.typedNamePair = obj.getTable().getMetadataObject().getProperty(NAMED_TYPE_PAIR, false);
-            }
 
-            
-            
-            if(isArrayTable.equals(TRUE_VALUE))  {
-                
-                
-                
-                boolean isPK = false;
-                boolean isIdx = false;
-                String leafName = ""; //$NON-NLS-1$
-                
-                if(isPKColumn(obj)) {
-                    isPK = true;
-                } else if(isIDXColumn(obj)) {
-                    isIdx = true;
-                } else if(obj.getMetadataObject().getNameInSource() != null && !obj.getMetadataObject().getNameInSource().endsWith(SQUARE_BRACKETS)){
-                    String nameInSource = obj.getMetadataObject().getNameInSource();
-                    leafName = nameInSource.substring(nameInSource.lastIndexOf(SOURCE_SEPARATOR) + 1, nameInSource.length());
-                    leafName = this.trimWave(leafName);
+            if(this.typedName == null && this.typedValue == null) {
+                String typedNamePair = obj.getTable().getMetadataObject().getProperty(NAMED_TYPE_PAIR, false);
+                if(typedNamePair != null && typedNamePair.length() > 0) {
+                    String[] pair = typedNamePair.split(COLON);
+                    this.typedName = pair[0];
+                    this.typedValue = pair[1];
                 }
-                
-                String colExpr = this.columnAliasGenerator.generate() + UNDERSCORE + obj.getName();
+            }
+            
+            boolean isPK = false;
+            boolean isIdx = false;
+            String leafName = ""; //$NON-NLS-1$
+            
+            if(isPKColumn(obj)) {
+                isPK = true;
+            } else if(isIDXColumn(obj)) {
+                isIdx = true;
+            } else if(obj.getMetadataObject().getNameInSource() != null && !obj.getMetadataObject().getNameInSource().endsWith(SQUARE_BRACKETS)){
+                String nameInSource = obj.getMetadataObject().getNameInSource();
+                leafName = nameInSource.substring(nameInSource.lastIndexOf(SOURCE_SEPARATOR) + 1, nameInSource.length());
+                leafName = this.trimWave(leafName);
+            }
+            
+            String colExpr = this.getColumnAliasGenerator().generate() + UNDERSCORE + obj.getName();
 
-                CBColumn column = new CBColumn(isPK, isIdx, colExpr, leafName);
+            CBColumn column = new CBColumn(isPK, isIdx, colExpr, leafName, obj.getMetadataObject().getNameInSource());
+            
+            if(this.typedName != null && this.typedValue != null && leafName.equals(trimWave(this.typedName))) {
+                String typedWhere = buildTypedWhere(nameInSource(colExpr), this.typedValue);
+                column.setTypedWhere(typedWhere);
+                this.typedWhere.add(column);
+            }
+            
+            if(recordColumnName) {
                 unnestStack.add(column);
-                
+                columnMap.put(obj.getName(), column);
+                this.selectColumns.add(colExpr);
                 buffer.append(this.nameInSource(colExpr));
-                if(recordColumnName) {
-                    this.selectColumns.add(colExpr);
-                }
-                
-                this.columnMap.put(obj.getName(), column);
-                
-            } else {
-                
-                if(isPKColumn(obj)) {
-                    String meta = buildMeta(tableAlias);
-                    if(recordColumnName) {
-                        buffer.append(meta).append(SPACE);
-                        String alias = this.columnAliasGenerator.generate();
-                        buffer.append(this.nameInSource(alias));
-                        selectColumns.add(alias);
-                        CBColumn column = new CBColumn(true, false, alias, null);
-                        column.setValueReference(buildEQ(alias) + meta);
-                        this.columnMap.put(obj.getName(), column);
-                    } else {
-                        buffer.append(meta); 
+            } else if(!recordColumnName && unnestStack.size() > 0){
+                String tableAlias = unnestStack.get(unnestStack.size() -1).getTableAlias();
+                String nameInSource = column.getNameInSource();
+                if(nameInSource != null) {
+                    nameInSource = nameInSource.substring(nameInSource.indexOf(SOURCE_SEPARATOR) + 1, nameInSource.length());
+                    if(!isWhereClause) {
+                        buffer.append(this.nameInSource(tableAlias)).append(SOURCE_SEPARATOR).append(nameInSource);
+                    } else if(!conlumnDuplicated(column.getNameInSource())) {
+                        buffer.append(this.nameInSource(tableAlias)).append(SOURCE_SEPARATOR).append(nameInSource);
                     }
-                    return;
-                }
-                
-                String columnName = obj.getMetadataObject().getNameInSource();
-                columnName = columnName.substring(columnName.indexOf(SOURCE_SEPARATOR) + 1, columnName.length());
-                buffer.append(nameInSource(tableAlias));
-                buffer.append(SOURCE_SEPARATOR);
-                buffer.append(columnName);
-                String alias = this.columnAliasGenerator.generate();
-                buffer.append(SPACE).append(this.nameInSource(alias));
-                if(recordColumnName) {
-                    this.selectColumns.add(alias);
-                }
-                CBColumn column = new CBColumn(false, false, alias, null);
-                column.setValueReference(buildEQ(alias) + nameInSource(tableAlias) + SOURCE_SEPARATOR + columnName);
-                this.columnMap.put(obj.getName(), column);
+                } else if(nameInSource == null && column.isPK()) {
+                    String metaId = this.buildMeta(tableAlias);
+                    buffer.append(metaId);
+                } else if(nameInSource == null && column.isIdx()) {
+                    // todo- array table should also support unrelated where/order by/group by
+                } 
             }
-
         } else {
             super.visit(obj);
         }
     }
-    
-    private String buildMeta(String alias) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("META").append(LPAREN).append(nameInSource(alias)).append(RPAREN).append(".id"); //$NON-NLS-1$ //$NON-NLS-2$
-        return sb.toString();
+
+    private boolean conlumnDuplicated(String nameInSource) {
+        boolean result = false;
+        for(CBColumn column : this.typedWhere) {
+            if(column.getNameInSource().equals(nameInSource)) {
+                result = true;
+                break;
+            }
+        }
+        return result;
     }
 
     private boolean isIDXColumn(ColumnReference obj) {
@@ -460,6 +484,20 @@ public class N1QLVisitor extends SQLStringVisitor{
 
     public List<String> getSelectColumnReferences() {
         return selectColumnReferences;
+    }
+
+    public AliasGenerator getColumnAliasGenerator() {
+        if(this.columnAliasGenerator == null) {
+            this.columnAliasGenerator = new AliasGenerator(N1QL_COLUMN_ALIAS_PREFIX);
+        }
+        return columnAliasGenerator;
+    }
+
+    public AliasGenerator getTableAliasGenerator() {
+        if(this.tableAliasGenerator == null) {
+            this.tableAliasGenerator = new AliasGenerator(N1QL_TABLE_ALIAS_PREFIX);
+        }
+        return tableAliasGenerator;
     }
 
     @Override
@@ -590,14 +628,18 @@ public class N1QLVisitor extends SQLStringVisitor{
         private boolean isIdx;
         private String nameReference;
         private String leafName;
+        private String nameInSource;
         private String valueReference;
         private String unnest;
+        private String tableAlias;
+        private String typedWhere;
 
-        public CBColumn(boolean isPK, boolean isIdx, String nameReference, String leafName) {
+        public CBColumn(boolean isPK, boolean isIdx, String nameReference, String leafName, String nameInSource) {
             this.isPK = isPK;
             this.isIdx = isIdx;
             this.nameReference = nameReference;
             this.leafName = leafName;
+            this.nameInSource = nameInSource;
         }
 
         public boolean isPK() {
@@ -612,12 +654,16 @@ public class N1QLVisitor extends SQLStringVisitor{
             return nameReference;
         }
         
-        public boolean hasNestedObject() {
+        public boolean hasLeaf() {
             return this.leafName != null && this.leafName.length() > 0;
         }
 
         public String getLeafName() {
             return leafName;
+        }
+
+        public String getNameInSource() {
+            return nameInSource;
         }
 
         public String getValueReference() {
@@ -638,6 +684,26 @@ public class N1QLVisitor extends SQLStringVisitor{
 
         public void setUnnest(String unnest) {
             this.unnest = unnest;
+        }
+        
+        public String getTableAlias() {
+            return tableAlias;
+        }
+
+        public void setTableAlias(String tableAlias) {
+            this.tableAlias = tableAlias;
+        }
+
+        public boolean hasTypedWhere() {
+            return this.typedWhere != null && this.typedWhere.length() > 0;
+        }
+
+        public String getTypedWhere() {
+            return typedWhere;
+        }
+
+        public void setTypedWhere(String typedWhere) {
+            this.typedWhere = typedWhere;
         }
     }
 }
