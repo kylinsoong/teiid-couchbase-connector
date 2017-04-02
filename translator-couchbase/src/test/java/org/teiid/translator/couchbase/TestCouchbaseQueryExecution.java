@@ -24,7 +24,6 @@ package org.teiid.translator.couchbase;
 import static org.teiid.translator.couchbase.TestCouchbaseMetadataProcessor.*;
 import static org.junit.Assert.*;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -51,21 +50,6 @@ public class TestCouchbaseQueryExecution {
             Object item = jsonArray.get(i);
             assertEquals(item.getClass(), JsonObject.class);
         }
-    }
-    
-    @Test
-    public void testBuildMatrix() {
-        
-        
-        
-    }
-    
-    private void buildMatrix(JsonArray jsonArray, List<List<?>> matrix) {
-
-        List<List<?>> allRow = new ArrayList<>();
-    }
-
-    
-    
+    }    
 
 }

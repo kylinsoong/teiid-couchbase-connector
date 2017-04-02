@@ -61,7 +61,9 @@ import static org.teiid.translator.couchbase.CouchbaseProperties.UNNEST_POSITION
 import static org.teiid.translator.couchbase.CouchbaseProperties.LET;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.teiid.language.Call;
 import org.teiid.language.ColumnReference;
@@ -88,6 +90,7 @@ public class N1QLVisitor extends SQLStringVisitor{
     private boolean recordColumnName = true;
     private List<String> selectColumns = new ArrayList<>();
     private List<String> selectColumnReferences = new ArrayList<>();
+    private Map<String, String> columnMap = new HashMap<>();
     
     private AliasGenerator columnAliasGenerator;
     private String tableAlias;
@@ -156,7 +159,6 @@ public class N1QLVisitor extends SQLStringVisitor{
                 buffer.append(this.unnestStack.get(i).getValueReference());
             }
         }
- 
     }
 
     private void appendWhere(Select obj) {
@@ -285,6 +287,13 @@ public class N1QLVisitor extends SQLStringVisitor{
         super.visit(obj);
         recordColumnName = true;
     }
+    
+    @Override
+    public void visit(Comparison obj) {
+        recordColumnName = false;
+        super.visit(obj);
+        recordColumnName = true;
+    }
 
     @Override
     public void visit(DerivedColumn obj) {
@@ -299,8 +308,13 @@ public class N1QLVisitor extends SQLStringVisitor{
         
         if(obj.getTable() != null) {
             
-            String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false);
+            if(!recordColumnName) {
+                String aliasName = this.columnMap.get(obj.getName());
+                buffer.append(aliasName);
+                return;
+            }
             
+            String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false); 
             if(isArrayTable.equals(TRUE_VALUE))  {
                 
                 this.isArrayTable = true;
@@ -328,6 +342,8 @@ public class N1QLVisitor extends SQLStringVisitor{
                     this.selectColumns.add(colExpr);
                 }
                 
+                this.columnMap.put(obj.getName(), this.nameInSource(colExpr));
+                
             } else {
                 
                 if(isPKColumn(obj)) {
@@ -336,6 +352,7 @@ public class N1QLVisitor extends SQLStringVisitor{
                         String alias = this.columnAliasGenerator.generate();
                         buffer.append(this.nameInSource(alias));
                         selectColumns.add(alias);
+                        this.columnMap.put(obj.getName(), this.nameInSource(alias));
                     } else {
                         buffer.append("META").append(LPAREN).append(nameInSource(tableAlias)).append(RPAREN).append(".id"); //$NON-NLS-1$ 
                     }
@@ -352,6 +369,7 @@ public class N1QLVisitor extends SQLStringVisitor{
                 if(recordColumnName) {
                     this.selectColumns.add(alias);
                 }
+                this.columnMap.put(obj.getName(), this.nameInSource(alias));
             }
 
         } else {
@@ -365,13 +383,6 @@ public class N1QLVisitor extends SQLStringVisitor{
 
     private boolean isPKColumn(ColumnReference obj) {
         return obj.getName().equals(DOCUMENTID) && obj.getMetadataObject().getNameInSource() == null;
-    }
-
-    @Override
-    public void visit(Comparison obj) {
-        recordColumnName = false;
-        super.visit(obj);
-        recordColumnName = true;
     }
 
     @Override

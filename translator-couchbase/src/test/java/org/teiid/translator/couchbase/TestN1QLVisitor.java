@@ -24,6 +24,28 @@ package org.teiid.translator.couchbase;
 import static org.teiid.translator.couchbase.TestCouchbaseMetadataProcessor.*;
 import static org.junit.Assert.*;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.Map.Entry;
+import java.util.Properties;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.teiid.adminapi.impl.ModelMetaData;
@@ -42,9 +64,20 @@ import org.teiid.query.unittest.RealMetadataFactory;
 import org.teiid.query.validator.ValidatorReport;
 import org.teiid.translator.TranslatorException;
 import org.teiid.translator.couchbase.CouchbaseMetadataProcessor.Dimension;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 @SuppressWarnings("nls")
 public class TestN1QLVisitor {
+    
+    private static Path N1QL_PATH = Paths.get("src/test/resources", "N1QL.properties");
+    private static Properties N1QL = new Properties();
+    
+    private static final Boolean PRINT_TO_CONSOLE = Boolean.TRUE;
+    private static final Boolean REPLACE_EXPECTED = Boolean.FALSE;
     
     private static TransformationMetadata queryMetadataInterface() {
         try {
@@ -85,234 +118,284 @@ public class TestN1QLVisitor {
         TRANSLATOR = new CouchbaseExecutionFactory();
         TRANSLATOR.start();
         translationUtility.addUDF(CoreConstants.SYSTEM_MODEL, TRANSLATOR.getPushDownFunctions());
+        
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(Files.newInputStream(N1QL_PATH));
+            doc.getDocumentElement().normalize();
+            
+            NodeList list = doc.getElementsByTagName("entry");
+            for (int i = 0; i < list.getLength(); i++) {
+                Node node = list.item(i);
+                if(node.getNodeType() == Node.ELEMENT_NODE) {
+                    Element element = (Element) node;
+                    N1QL.put(element.getAttribute("key"), element.getTextContent());
+                }  
+            } 
+        } catch (ParserConfigurationException | SAXException | IOException e1) {
+            assert(false);
+        }
+
     }
     
-    private void helpTest(String sql, String expected) throws TranslatorException {
+    @AfterClass
+    public static void replaceProperties() {
+        
+        if(REPLACE_EXPECTED.booleanValue()) {
+            OutputStream out = null;
+            try {
+                out = new FileOutputStream(N1QL_PATH.toFile());
+                String encoding = "UTF-8";
+                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                DocumentBuilder db = dbf.newDocumentBuilder();
+                Document doc = db.newDocument();
+                Element properties =  (Element) doc.appendChild(doc.createElement("properties"));
+                for (Entry<Object, Object> e : N1QL.entrySet()) {
+                    final String key = (String) e.getKey();
+                    final String value = (String) e.getValue();
+                    if(key.startsWith("n1ql.")){
+                        Element entry = (Element)properties.appendChild(doc.createElement("entry"));
+                        entry.setAttribute("key", key);
+                        entry.appendChild(doc.createTextNode(value));
+                    }
+                }
+                
+                TransformerFactory tf = TransformerFactory.newInstance();
+                Transformer t = tf.newTransformer();
+                t.setOutputProperty(OutputKeys.INDENT, "yes");
+                t.setOutputProperty(OutputKeys.METHOD, "xml");
+                t.setOutputProperty(OutputKeys.ENCODING, encoding);
+                DOMSource doms = new DOMSource(doc);
+                StreamResult sr = new StreamResult(out);
+                t.transform(doms, sr);
+            } catch (IOException | ParserConfigurationException | TransformerException e) {
+                assert(false);
+            } finally {
+                out = null;
+            }
+        }
+    }
+    
+    private void helpTest(String sql, String key) throws TranslatorException {
 
         Command command = translationUtility.parseCommand(sql);
 
         N1QLVisitor visitor = TRANSLATOR.getN1QLVisitor();
         visitor.append(command);
-
-        System.out.println(visitor.toString());
-        assertEquals(expected, visitor.toString());
+        String actual = visitor.toString();
+        
+        if(PRINT_TO_CONSOLE.booleanValue()) {
+            System.out.println(actual);
+        }
+        
+        if(REPLACE_EXPECTED.booleanValue()) {
+            N1QL.put(key, actual);
+        }
+        
+        assertEquals(N1QL.getProperty(key, ""), actual);
     }
     
     @Test
     public void testSelect() throws TranslatorException {
         
         String sql = "SELECT * FROM Customer";
-        helpTest(sql, "SELECT META().id AS PK, `ID`, `type`, `Name` FROM `test` WHERE `type` = 'Customer'");
+        helpTest(sql, "n1ql.testSelect.Customer");
       
         sql = "SELECT * FROM Customer_SavedAddresses";
-        helpTest(sql, "SELECT META().id AS PK, `SavedAddresses` FROM `test`.`SavedAddresses`");
-        
-        sql = "SELECT * FROM Customer_SavedAddresses AS T";
-        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`SavedAddresses` AS T");
+        helpTest(sql, "n1ql.testSelect.Customer_SavedAddresses");
         
         sql = "SELECT * FROM Oder";
-        helpTest(sql, "SELECT META().id AS PK, `CustomerID`, `type`, `test`.`CreditCard`.`CardNumber`, `test`.`CreditCard`.`Type`, `test`.`CreditCard`.`CVN`, `test`.`CreditCard`.`Expiry`, `Name` FROM `test` WHERE `type` = 'Oder'");
+        helpTest(sql, "n1ql.testSelect.Oder");
         
         sql = "SELECT * FROM Oder_Items";
-        helpTest(sql, "SELECT META().id AS PK, `Items` FROM `test`.`Items`");
+        helpTest(sql, "n1ql.testSelect.Oder_Items");
         
-        sql = "SELECT * FROM Oder_Items AS T";
-        helpTest(sql, "SELECT META().id AS PK, T FROM `test`.`Items` AS T");
-    }
-    
-    @Test
-    public void testSelectClause() throws TranslatorException {
-        
-        String sql = "SELECT DISTINCT Name FROM Customer";
-        helpTest(sql, "SELECT DISTINCT `Name` FROM `test` WHERE `type` = 'Customer'");
+        sql = "SELECT DISTINCT Name FROM Customer";
+        helpTest(sql, "n1ql.testSelect.Customer.distinct");
         
         sql = "SELECT ALL Name FROM Customer";
-        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer'");
+        helpTest(sql, "n1ql.testSelect.Customer.all");
     }
-    
+
     @Test
     public void testNestedJson() throws TranslatorException  {
         
         String sql = "SELECT * FROM T3";
-        helpTest(sql, "SELECT META().id AS PK, `T3`.`nestedJson`.`nestedJson`.`nestedJson`.`nestedJson`, `T3`.`nestedJson`.`nestedJson`.`nestedJson`.`Dimension`, `T3`.`nestedJson`.`nestedJson`.`Dimension`, `T3`.`nestedJson`.`Dimension`, `Name` FROM `T3`");
+        helpTest(sql, "n1ql.testNestedJson.T3");
     }
     
     @Test
     public void testNestedArray() throws TranslatorException {
         
-        String sql = "SELECT * FROM T3_nestedArray";
-//        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
+        String sql = "SELECT * FROM T3";
+        helpTest(sql, "n1ql.testNestedArray.T3");
         
-        sql = "SELECT * FROM T3_nestedArray_dim1";
-//        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
+        sql = "SELECT * FROM T3_nestedArray";
+        helpTest(sql, "n1ql.testNestedArray.T3_nestedArray");
         
-        sql = "SELECT * FROM T3_nestedArray_dim1_dim2";
-//        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
+        sql = "SELECT * FROM T3_nestedArray_dim2";
+        helpTest(sql, "n1ql.testNestedArray.T3_nestedArray_dim2");
+        
+        sql = "SELECT * FROM T3_nestedArray_dim2_dim3";
+        helpTest(sql, "n1ql.testNestedArray.T3_nestedArray_dim2_dim3");
         
         sql = "SELECT * FROM T3_nestedArray_dim2_dim3_dim4";
-        helpTest(sql, "SELECT META().id AS PK, `nestedArray` FROM `T3`.`nestedArray`");
+        helpTest(sql, "n1ql.testNestedArray.T3_nestedArray_dim2_dim3_dim4");
     }
     
     @Test
     public void testPKColumn() throws TranslatorException {
         
-        String sql = "SELECT \"_documentId\" FROM T3";
-        helpTest(sql, "SELECT META().id AS PK FROM `T3`");
+        String sql = "SELECT documentID FROM T3";
+        helpTest(sql, "n1ql.testPKColumn.T3");
         
-        sql = "SELECT \"_documentId\" FROM T3_nestedArray";
-        helpTest(sql, "SELECT META().id AS PK FROM `T3`.`nestedArray`");
+        sql = "SELECT documentID FROM T3_nestedArray_dim2_dim3_dim4";
+        helpTest(sql, "n1ql.testPKColumn.T3_nestedArray_dim2_dim3_dim4");
     }
     
     @Test
     public void testLimitOffsetClause() throws TranslatorException {
         
         String sql = "SELECT Name FROM Customer LIMIT 2";
-        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer' LIMIT 2");
+        helpTest(sql, "n1ql.testLimitOffsetClause.Customer.limit");
         
         sql = "SELECT Name FROM Customer LIMIT 2, 2";
-        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer' LIMIT 2 OFFSET 2");
+        helpTest(sql, "n1ql.testLimitOffsetClause.Customer.limitoffset");
         
         sql = "SELECT Name FROM Customer OFFSET 2 ROWS";
-        helpTest(sql, "SELECT `Name` FROM `test` WHERE `type` = 'Customer' LIMIT 2147483647 OFFSET 2");
+        helpTest(sql, "n1ql.testLimitOffsetClause.Customer.offset");
     }
     
     @Test
     public void testOrderByClause() throws TranslatorException {
         
         String sql = "SELECT Name, type FROM Customer ORDER BY Name";
-        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE `type` = 'Customer' ORDER BY `Name`");
+        helpTest(sql, "n1ql.testOrderByClause.Customer");
         
         sql = "SELECT type FROM Customer ORDER BY Name"; //Unrelated
-        helpTest(sql, "SELECT `type` FROM `test` WHERE `type` = 'Customer' ORDER BY `Name`");
+        helpTest(sql, "n1ql.testOrderByClause.Customer.Unrelated");
         
         sql = "SELECT Name, type FROM Customer ORDER BY type"; //NullOrdering
-        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE `type` = 'Customer' ORDER BY `type`");
+        helpTest(sql, "n1ql.testOrderByClause.Customer.NullOrdering");
     }
     
     @Test
     public void testGroupByClause() throws TranslatorException {
         
         String sql = "SELECT Name, COUNT(*) FROM Customer GROUP BY Name";
-        helpTest(sql, "SELECT `Name`, COUNT(*) FROM `test` WHERE `type` = 'Customer' GROUP BY `Name`");
+        helpTest(sql, "n1ql.testGroupByClause.Name");
     }
     
     @Test
     public void testWhereClause() throws TranslatorException {
         
         String sql = "SELECT Name, type  FROM Customer WHERE Name = 'John Doe'";
-        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE `Name` = 'John Doe' AND `type` = 'Customer'");
+        helpTest(sql, "n1ql.testWhereClause.Name");
         
-        sql = "SELECT Name, type  FROM Customer WHERE \"_documentId\" = 'customer'";
-        helpTest(sql, "SELECT `Name`, `type` FROM `test` WHERE META().id = 'customer' AND `type` = 'Customer'");
+        sql = "SELECT Name, type  FROM Customer WHERE documentID = 'customer'";
+        helpTest(sql, "n1ql.testWhereClause.documentID");
     }
     
     @Test
     public void testStringFunctions() throws TranslatorException {
         
         String sql = "SELECT LCASE(attr_string) FROM T2";
-        helpTest(sql, "SELECT LOWER(`attr_string`) FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.LCASE");
         
         sql = "SELECT UCASE(attr_string) FROM T2";
-        helpTest(sql, "SELECT UPPER(`attr_string`) FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.UCASE");
         
         sql = "SELECT TRANSLATE(attr_string, 'is', 'are') FROM T2";
-        helpTest(sql, "SELECT REPLACE(`attr_string`, 'is', 'are') FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.TRANSLATE");
         
         sql = "SELECT couchbase.CONTAINS(attr_string, 'is') FROM T2";
-        helpTest(sql, "SELECT CONTAINS(`attr_string`, 'is') FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.CONTAINS");
         
         sql = "SELECT couchbase.TITLE(attr_string) FROM T2";
-        helpTest(sql, "SELECT TITLE(`attr_string`) FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.TITLE");
         
         sql = "SELECT couchbase.LTRIM(attr_string, 'This') FROM T2";
-        helpTest(sql, "SELECT LTRIM(`attr_string`, 'This') FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.LTRIM");
         
         sql = "SELECT couchbase.TRIM(attr_string, 'is') FROM T2";
-        helpTest(sql, "SELECT TRIM(`attr_string`, 'is') FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.TRIM");
         
         sql = "SELECT couchbase.RTRIM(attr_string, 'value') FROM T2";
-        helpTest(sql, "SELECT RTRIM(`attr_string`, 'value') FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.RTRIM");
         
         sql = "SELECT couchbase.POSITION(attr_string, 'is') FROM T2";
-        helpTest(sql, "SELECT POSITION(`attr_string`, 'is') FROM `T2`");
+        helpTest(sql, "n1ql.StringFunctions.POSITION");
     }
     
     @Test
     public void testNumbericFunctions() throws TranslatorException {
         
         String sql = "SELECT CEILING(attr_double) FROM T2";
-        helpTest(sql, "SELECT CEIL(`attr_double`) FROM `T2`"); 
+        helpTest(sql, "n1ql.testNumbericFunctions.CEILING"); 
         
         sql = "SELECT LOG(attr_double) FROM T2";
-        helpTest(sql, "SELECT LN(`attr_double`) FROM `T2`"); 
+        helpTest(sql, "n1ql.testNumbericFunctions.LOG"); 
         
         sql = "SELECT LOG10(attr_double) FROM T2";
-        helpTest(sql, "SELECT LOG(`attr_double`) FROM `T2`"); 
+        helpTest(sql, "n1ql.testNumbericFunctions.LOG10"); 
         
         sql = "SELECT RAND(attr_integer) FROM T2";
-        helpTest(sql, "SELECT RANDOM(`attr_integer`) FROM `T2`"); 
+        helpTest(sql, "n1ql.testNumbericFunctions.RAND"); 
     }
     
     @Test
     public void testConversionFunctions() throws TranslatorException {
 
         String sql = "SELECT convert(attr_long, string) FROM T2";
-        helpTest(sql, "SELECT TOSTRING(`attr_long`) FROM `T2`");
+        helpTest(sql, "n1ql.ConversionFunctions.T2");
     }
     
     @Test
     public void testDateFunctions() throws TranslatorException {
         
         String sql = "SELECT couchbase.CLOCK_MILLIS() FROM T2";
-        helpTest(sql, "SELECT CLOCK_MILLIS() FROM `T2`"); 
+        helpTest(sql, "n1ql.DateFunctions.CLOCK_MILLIS"); 
         
         sql = "SELECT couchbase.CLOCK_STR() FROM T2";
-        helpTest(sql, "SELECT CLOCK_STR() FROM `T2`"); 
+        helpTest(sql, "n1ql.DateFunctions.CLOCK_STR.T2"); 
         
         sql = "SELECT couchbase.CLOCK_STR('2006-01-02') FROM T2";
-        helpTest(sql, "SELECT CLOCK_STR('2006-01-02') FROM `T2`");
+        helpTest(sql, "n1ql.DateFunctions.CLOCK_STR");
                 
         sql = "SELECT couchbase.DATE_ADD_MILLIS(1488873653696, 2, 'century') FROM T2";
-        helpTest(sql, "SELECT DATE_ADD_MILLIS(1488873653696, 2, 'century') FROM `T2`"); 
+        helpTest(sql, "n1ql.DateFunctions.DATE_ADD_MILLIS"); 
         
         sql = "SELECT couchbase.DATE_ADD_STR('2017-03-08', 2, 'century') FROM T2";
-        helpTest(sql, "SELECT DATE_ADD_STR('2017-03-08', 2, 'century') FROM `T2`"); 
+        helpTest(sql, "n1ql.DateFunctions.DATE_ADD_STR"); 
     }
     
     @Test
     public void testProcedures() throws TranslatorException {
        
         String sql = "call getTextDocuments('%e%', 'test')";
-        helpTest(sql, "SELECT META().id AS id, result FROM `test` AS result WHERE META().id LIKE '%e%'");
+        helpTest(sql, "n1ql.Procedures.getTextDocuments");
         
         sql = "call getDocuments('customer', 'test')";
-        helpTest(sql, "SELECT result FROM `test` AS result WHERE META().id LIKE 'customer'");
+        helpTest(sql, "n1ql.Procedures.");
         
         sql = "call getTextDocument('customer', 'test')";
-        helpTest(sql, "SELECT META().id AS id, result FROM `test` AS result USE PRIMARY KEYS 'customer'");
+        helpTest(sql, "n1ql.Procedures.getDocuments");
         
         sql = "call getDocument('customer', 'test')";
-        helpTest(sql, "SELECT result FROM `test` AS result USE PRIMARY KEYS 'customer'");
+        helpTest(sql, "n1ql.Procedures.getDocument");
         
         sql = "call saveDocument('k001', 'test', '{\"key\": \"value\"}')";
-        helpTest(sql, "UPSERT INTO `test` (KEY, VALUE) VALUES ('k001', '{\"key\": \"value\"}')");
+        helpTest(sql, "n1ql.Procedures.saveDocument");
         
         sql = "call deleteDocument('k001', 'test')";
-        helpTest(sql, "DELETE FROM `test` USE PRIMARY KEYS 'k001'");
+        helpTest(sql, "n1ql.Procedures.deleteDocument");
         
         sql = "call getTextMetadataDocument('test')";
-        helpTest(sql, "SELECT META(`test`) AS result FROM `test`");
+        helpTest(sql, "n1ql.Procedures.getTextMetadataDocument");
         
         sql = "call getMetadataDocument('test')";
-        helpTest(sql, "SELECT META(`test`) AS result FROM `test`");
+        helpTest(sql, "n1ql.Procedures.getMetadataDocument");
     }
     
-    @Test
-    public void testNameInSource() throws TranslatorException {
-        
-        String sql = "SELECT * FROM Oder_Items";
-        helpTest(sql, "SELECT META().id AS PK, `Items` FROM `test`.`Items`");
-    }
-   
-
 }
