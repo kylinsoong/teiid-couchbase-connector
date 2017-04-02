@@ -26,12 +26,10 @@ import static org.junit.Assert.*;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -290,7 +288,10 @@ public class TestN1QLVisitor {
     @Test
     public void testWhereClause() throws TranslatorException {
         
-        String sql = "SELECT Name, type  FROM Customer WHERE Name = 'John Doe'";
+        String sql = "SELECT Name, type  FROM Customer";
+//        helpTest(sql, "n1ql.testWhereClause.Customer");
+        
+        sql = "SELECT Name, type  FROM Customer WHERE Name = 'John Doe'";
         helpTest(sql, "n1ql.testWhereClause.Name");
         
         sql = "SELECT Name, type  FROM Customer WHERE documentID = 'customer'";

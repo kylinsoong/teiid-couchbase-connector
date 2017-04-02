@@ -90,7 +90,7 @@ public class N1QLVisitor extends SQLStringVisitor{
     private boolean recordColumnName = true;
     private List<String> selectColumns = new ArrayList<>();
     private List<String> selectColumnReferences = new ArrayList<>();
-    private Map<String, String> columnMap = new HashMap<>();
+    private Map<String, CBColumn> columnMap = new HashMap<>();
     
     private AliasGenerator columnAliasGenerator;
     private String tableAlias;
@@ -158,7 +158,7 @@ public class N1QLVisitor extends SQLStringVisitor{
                 comma = true;
                 buffer.append(this.unnestStack.get(i).getValueReference());
             }
-        }
+        } 
     }
 
     private void appendWhere(Select obj) {
@@ -309,10 +309,10 @@ public class N1QLVisitor extends SQLStringVisitor{
         if(obj.getTable() != null) {
             
             if(!recordColumnName) {
-                String aliasName = this.columnMap.get(obj.getName());
-                buffer.append(aliasName);
+                String aliasName = this.columnMap.get(obj.getName()).getNameReference();
+                buffer.append(this.nameInSource(aliasName));
                 return;
-            }
+            } 
             
             String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false); 
             if(isArrayTable.equals(TRUE_VALUE))  {
@@ -335,26 +335,30 @@ public class N1QLVisitor extends SQLStringVisitor{
                 
                 String colExpr = this.columnAliasGenerator.generate() + UNDERSCORE + obj.getName();
 
-                unnestStack.add(new CBColumn(isPK, isIdx, colExpr, leafName));
+                CBColumn column = new CBColumn(isPK, isIdx, colExpr, leafName);
+                unnestStack.add(column);
                 
                 buffer.append(this.nameInSource(colExpr));
                 if(recordColumnName) {
                     this.selectColumns.add(colExpr);
                 }
                 
-                this.columnMap.put(obj.getName(), this.nameInSource(colExpr));
+                this.columnMap.put(obj.getName(), column);
                 
             } else {
                 
                 if(isPKColumn(obj)) {
+                    String meta = buildMeta(tableAlias);
                     if(recordColumnName) {
-                        buffer.append("META").append(LPAREN).append(nameInSource(tableAlias)).append(RPAREN).append(".id").append(SPACE); //$NON-NLS-1$ //$NON-NLS-2$
+                        buffer.append(meta).append(SPACE);
                         String alias = this.columnAliasGenerator.generate();
                         buffer.append(this.nameInSource(alias));
                         selectColumns.add(alias);
-                        this.columnMap.put(obj.getName(), this.nameInSource(alias));
+                        CBColumn column = new CBColumn(true, false, alias, null);
+                        column.setValueReference(buildEQ(alias) + meta);
+                        this.columnMap.put(obj.getName(), column);
                     } else {
-                        buffer.append("META").append(LPAREN).append(nameInSource(tableAlias)).append(RPAREN).append(".id"); //$NON-NLS-1$ 
+                        buffer.append(meta); 
                     }
                     return;
                 }
@@ -369,7 +373,9 @@ public class N1QLVisitor extends SQLStringVisitor{
                 if(recordColumnName) {
                     this.selectColumns.add(alias);
                 }
-                this.columnMap.put(obj.getName(), this.nameInSource(alias));
+                CBColumn column = new CBColumn(false, false, alias, null);
+                column.setValueReference(buildEQ(alias) + nameInSource(tableAlias) + SOURCE_SEPARATOR + columnName);
+                this.columnMap.put(obj.getName(), column);
             }
 
         } else {
@@ -377,6 +383,12 @@ public class N1QLVisitor extends SQLStringVisitor{
         }
     }
     
+    private String buildMeta(String alias) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("META").append(LPAREN).append(nameInSource(alias)).append(RPAREN).append(".id"); //$NON-NLS-1$ //$NON-NLS-2$
+        return sb.toString();
+    }
+
     private boolean isIDXColumn(ColumnReference obj) {
         return obj.getName().endsWith(IDX_SUFFIX) && obj.getMetadataObject().getNameInSource() == null;
     }
