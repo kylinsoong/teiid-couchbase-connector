@@ -23,8 +23,10 @@ package org.teiid.translator.couchbase;
 
 import static org.junit.Assert.*;
 import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.STRING;
+import static org.teiid.translator.couchbase.CouchbaseProperties.COLON;
 import static org.teiid.translator.couchbase.CouchbaseProperties.DOCUMENTID;
 import static org.teiid.translator.couchbase.CouchbaseProperties.FALSE_VALUE;
+import static org.teiid.translator.couchbase.CouchbaseProperties.QUOTE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.UNDERSCORE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
 import static org.teiid.translator.couchbase.CouchbaseMetadataProcessor.IS_ARRAY_TABLE;
@@ -228,7 +230,7 @@ public class TestCouchbaseMetadataProcessor {
     
     private static String buildNamedTypePair(String columnIdentifierName, String typedValue) {
         StringBuilder sb = new StringBuilder();
-        sb.append(columnIdentifierName).append(" = '").append(typedValue).append("'"); //$NON-NLS-1$ //$NON-NLS-2$
+        sb.append(columnIdentifierName).append(COLON).append(QUOTE).append(typedValue).append(QUOTE); 
         return sb.toString();
     }
     

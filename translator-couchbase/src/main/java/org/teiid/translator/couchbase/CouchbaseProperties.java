@@ -25,6 +25,7 @@ public interface CouchbaseProperties {
     
     String WAVE = "`"; //$NON-NLS-1$
     String COLON = ":"; //$NON-NLS-1$
+    String QUOTE = "'"; //$NON-NLS-1$
     String SOURCE_SEPARATOR = "."; //$NON-NLS-1$
     String PLACEHOLDER = "$"; //$NON-NLS-1$
     String JSON = "json"; //$NON-NLS-1$ 

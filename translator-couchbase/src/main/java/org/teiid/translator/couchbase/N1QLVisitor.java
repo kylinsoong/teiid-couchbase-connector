@@ -98,6 +98,8 @@ public class N1QLVisitor extends SQLStringVisitor{
     private boolean isArrayTable = false;
     private List<CBColumn> unnestStack = new ArrayList<>();
     
+    private String typedNamePair = null;
+    
 
     public N1QLVisitor(CouchbaseExecutionFactory ef) {
         this.ef = ef;
@@ -163,6 +165,7 @@ public class N1QLVisitor extends SQLStringVisitor{
 
     private void appendWhere(Select obj) {
 
+        recordColumnName = false;
         List<String> typedList = getTypedList(obj.getFrom());
         if (obj.getWhere() != null && typedList.size() == 0) {
             buffer.append(SPACE).append(WHERE).append(SPACE);
@@ -174,6 +177,7 @@ public class N1QLVisitor extends SQLStringVisitor{
         } else if (obj.getWhere() == null && typedList.size() > 0) {
             buffer.append(SPACE).append(WHERE).append(SPACE).append(typedList.get(0));
         }
+        recordColumnName = true;
     }
     
     private List<String> getTypedList(List<TableReference> references) {
@@ -315,9 +319,19 @@ public class N1QLVisitor extends SQLStringVisitor{
             } 
             
             String isArrayTable = obj.getTable().getMetadataObject().getProperty(IS_ARRAY_TABLE, false); 
+            if(isArrayTable.equals(TRUE_VALUE)) {
+                this.isArrayTable = true;
+            }
+            
+            if(typedNamePair == null) {
+                this.typedNamePair = obj.getTable().getMetadataObject().getProperty(NAMED_TYPE_PAIR, false);
+            }
+
+            
+            
             if(isArrayTable.equals(TRUE_VALUE))  {
                 
-                this.isArrayTable = true;
+                
                 
                 boolean isPK = false;
                 boolean isIdx = false;

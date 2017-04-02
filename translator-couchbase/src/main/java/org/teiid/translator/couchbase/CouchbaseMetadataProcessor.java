@@ -26,6 +26,7 @@ import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.OBJECT;
 import static org.teiid.translator.TypeFacility.RUNTIME_NAMES.INTEGER;
 import static org.teiid.translator.couchbase.CouchbaseProperties.WAVE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.COLON;
+import static org.teiid.translator.couchbase.CouchbaseProperties.QUOTE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.SOURCE_SEPARATOR;
 import static org.teiid.translator.couchbase.CouchbaseProperties.UNDERSCORE;
 import static org.teiid.translator.couchbase.CouchbaseProperties.NAME;
@@ -444,7 +445,7 @@ public class CouchbaseMetadataProcessor implements MetadataProcessor<CouchbaseCo
     
     private String buildNamedTypePair(String columnIdentifierName, String typedValue) {
         StringBuilder sb = new StringBuilder();
-        sb.append(columnIdentifierName).append(" = '").append(typedValue).append("'"); //$NON-NLS-1$ //$NON-NLS-2$
+        sb.append(columnIdentifierName).append(COLON).append(QUOTE).append(typedValue).append(QUOTE); 
         return sb.toString();
     }
     
