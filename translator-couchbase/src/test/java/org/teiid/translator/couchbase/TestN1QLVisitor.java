@@ -292,7 +292,7 @@ public class TestN1QLVisitor {
 //        helpTest(sql, "n1ql.testWhereClause.Name");
         
         sql = "SELECT Name, type  FROM Customer WHERE documentID = 'customer'";
-//        helpTest(sql, "n1ql.testWhereClause.documentID");
+        helpTest(sql, "n1ql.testWhereClause.documentID");
         
         sql = "SELECT Name, type  FROM Customer WHERE type = 'Customer'";
         helpTest(sql, "n1ql.testWhereClause.type");
