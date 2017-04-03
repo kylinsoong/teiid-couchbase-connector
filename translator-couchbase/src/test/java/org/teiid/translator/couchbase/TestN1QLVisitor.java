@@ -289,13 +289,19 @@ public class TestN1QLVisitor {
     public void testWhereClause() throws TranslatorException {
         
         String sql = "SELECT Name, type  FROM Customer WHERE Name = 'John Doe'";
-//        helpTest(sql, "n1ql.testWhereClause.Name");
+        helpTest(sql, "n1ql.testWhereClause.Name");
         
         sql = "SELECT Name, type  FROM Customer WHERE documentID = 'customer'";
         helpTest(sql, "n1ql.testWhereClause.documentID");
         
         sql = "SELECT Name, type  FROM Customer WHERE type = 'Customer'";
-        helpTest(sql, "n1ql.testWhereClause.type");
+        helpTest(sql, "n1ql.testWhereClause.duplicated");
+        
+        sql = "SELECT Name FROM Customer";
+        helpTest(sql, "n1ql.testWhereClause.unrelated");
+        
+        sql = "SELECT Name FROM Customer WHERE documentID = 'customer'";
+        helpTest(sql, "n1ql.testWhereClause.unrelated.where");
     }
     
     @Test

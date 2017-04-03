@@ -99,6 +99,8 @@ public class N1QLVisitor extends SQLStringVisitor{
     private List<CBColumn> letStack = new ArrayList<>();
     private List<CBColumn> unrelatedStack = new ArrayList<>();
     
+    private List<CBColumn> tmpStack = new ArrayList<>();
+    
     private String typedName = null;
     private String typedValue = null;
     
@@ -212,24 +214,56 @@ public class N1QLVisitor extends SQLStringVisitor{
 
     private void appendWhere(Select obj) {
         
-        List<CBColumn> typedColumn = new ArrayList<>();
-        for(CBColumn column : this.letStack) {
-            if(column.hasTypedWhere()) {
-                typedColumn.add(column);
+        this.tmpStack.clear();
+        
+        if(this.typedName != null && this.typedValue != null) {
+            
+            boolean isTypedNameInLetStack = false;
+            List<CBColumn> typedColumn = new ArrayList<>();
+            for(CBColumn column : this.letStack) {
+                if(column.hasTypedWhere() && column.getLeafName().equals(trimWave(this.typedName))) {
+                    typedColumn.add(column);
+                    isTypedNameInLetStack = true;
+                }
+            }
+            
+            if(isTypedNameInLetStack) {
+                if(obj.getWhere() != null) {
+                    buffer.append(SPACE).append(WHERE).append(SPACE);
+                    append(obj.getWhere());
+                    if(!isDuplicatedTypeColumn(typedColumn)) {
+                        appendTypedWhere(false, typedColumn);
+                    }
+                } else {
+                    if(!isDuplicatedTypeColumn(typedColumn)) {
+                        buffer.append(SPACE).append(WHERE).append(SPACE);
+                        appendTypedWhere(true, typedColumn);
+                    }
+                }
+            } else {
+                String keyspace = this.nameInSource(this.letStack.get(this.letStack.size() - 1).getTableAlias());
+                String unrelatedType = keyspace + SOURCE_SEPARATOR + buildTypedWhere(this.typedName, this.typedValue);
+                if(obj.getWhere() != null) {
+                    buffer.append(SPACE).append(WHERE).append(SPACE);
+                    append(obj.getWhere());
+                    if(!isDuplicatedTypeColumn(this.typedName)){
+                        buffer.append(SPACE).append(Reserved.AND).append(SPACE).append(unrelatedType);
+                    }
+                } else {
+                    if(!isDuplicatedTypeColumn(this.typedName)) {
+                        buffer.append(SPACE).append(WHERE).append(SPACE);
+                        buffer.append(unrelatedType);
+                    }
+                }
+            }
+            
+        } else {
+            if(obj.getWhere() != null) {
+                buffer.append(SPACE).append(WHERE).append(SPACE);
+                append(obj.getWhere());
             }
         }
         
-        if (obj.getWhere() != null && typedColumn.size() == 0) {
-            buffer.append(SPACE).append(WHERE).append(SPACE);
-            append(obj.getWhere());
-        } else if (obj.getWhere() != null && typedColumn.size() > 0) {
-            buffer.append(SPACE).append(WHERE).append(SPACE);
-            append(obj.getWhere());
-            appendTypedWhere(false, typedColumn);
-        } else if (obj.getWhere() == null && typedColumn.size() > 0) {
-            buffer.append(SPACE).append(WHERE).append(SPACE);
-            appendTypedWhere(true, typedColumn);
-        }
     }
 
     private void appendTypedWhere(boolean and, List<CBColumn> typedColumn) {
@@ -243,6 +277,45 @@ public class N1QLVisitor extends SQLStringVisitor{
                 }
             }
         }
+    }
+    
+    private boolean isDuplicatedTypeColumn(List<CBColumn> typedColumn) {
+        boolean result = false;
+        for(CBColumn column : typedColumn) {
+            if(isDuplicatedTypeColumn(column)) {
+                result = true;
+                break;
+            }
+        } 
+        return result;
+    }
+
+    private boolean isDuplicatedTypeColumn(CBColumn typed) {
+        if(typed.isPK() || typed.isIdx()) {
+            return false;
+        }
+        boolean result = false;
+        for(CBColumn column : this.tmpStack) {
+            if(column.isPK() || column.isIdx()) {
+                continue;
+            }
+            if(column.getNameInSource().equals(typed.getNameInSource())) {
+                result = true;
+                break;
+            }
+        }
+        return result;
+    }
+    
+    private boolean isDuplicatedTypeColumn(String typedName) {
+        boolean result = false;
+        for(CBColumn column : this.tmpStack) {
+            if(column.getLeafName().equals(this.trimWave(typedName))) {
+                result = true;
+                break;
+            }
+        }
+        return result;
     }
 
     @Override
@@ -408,6 +481,7 @@ public class N1QLVisitor extends SQLStringVisitor{
             if(!isUnrelatedColumns && !recordColumnName && this.columnMap.get(obj.getName()) != null) {
                 String aliasName = this.columnMap.get(obj.getName()).getNameReference();
                 buffer.append(this.nameInSource(aliasName));
+                this.tmpStack.add(this.columnMap.get(obj.getName()));
                 return;
             } 
             
