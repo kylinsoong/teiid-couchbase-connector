@@ -21,6 +21,7 @@
  */
 package org.teiid.translator.couchbase;
 
+import static org.teiid.language.SQLConstants.Reserved.BY;
 import static org.teiid.language.SQLConstants.Reserved.CAST;
 import static org.teiid.language.SQLConstants.Reserved.CONVERT;
 import static org.teiid.language.SQLConstants.Reserved.DISTINCT;
@@ -28,6 +29,7 @@ import static org.teiid.language.SQLConstants.Reserved.FROM;
 import static org.teiid.language.SQLConstants.Reserved.HAVING;
 import static org.teiid.language.SQLConstants.Reserved.LIMIT;
 import static org.teiid.language.SQLConstants.Reserved.OFFSET;
+import static org.teiid.language.SQLConstants.Reserved.ORDER;
 import static org.teiid.language.SQLConstants.Reserved.SELECT;
 import static org.teiid.language.SQLConstants.Reserved.WHERE;
 import static org.teiid.language.SQLConstants.Tokens.COMMA;
@@ -72,7 +74,6 @@ import org.teiid.language.Comparison;
 import org.teiid.language.DerivedColumn;
 import org.teiid.language.Function;
 import org.teiid.language.GroupBy;
-import org.teiid.language.LanguageObject;
 import org.teiid.language.Limit;
 import org.teiid.language.Literal;
 import org.teiid.language.NamedTable;
@@ -145,7 +146,7 @@ public class N1QLVisitor extends SQLStringVisitor{
             append(obj.getOrderBy());
         }
         
-        if (!useSelectLimit() && obj.getLimit() != null) {
+        if (obj.getLimit() != null) {
             buffer.append(Tokens.SPACE);
             append(obj.getLimit());
         }
@@ -206,8 +207,10 @@ public class N1QLVisitor extends SQLStringVisitor{
             append(obj.getWhere());
         }
         
-        //TODO -- add order by, group by, having
-        
+        if (obj.getOrderBy() != null) {
+            append(obj.getOrderBy());
+        }
+                
         isUnrelatedColumns = false;
         
     }
@@ -430,11 +433,6 @@ public class N1QLVisitor extends SQLStringVisitor{
     }
 
     @Override
-    protected void append(List<? extends LanguageObject> items) {
-        super.append(items);
-    }
-
-    @Override
     public void visit(GroupBy obj) {
         recordColumnName = false;
         super.visit(obj);
@@ -444,7 +442,10 @@ public class N1QLVisitor extends SQLStringVisitor{
     @Override
     public void visit(OrderBy obj) {
         recordColumnName = false;
-        super.visit(obj);
+        if(!isUnrelatedColumns) {
+            buffer.append(ORDER).append(Tokens.SPACE).append(BY).append(Tokens.SPACE);
+        }
+        append(obj.getSortSpecifications());
         recordColumnName = true;
     }
     

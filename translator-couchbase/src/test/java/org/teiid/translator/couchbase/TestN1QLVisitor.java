@@ -75,7 +75,7 @@ public class TestN1QLVisitor {
     private static Path N1QL_PATH = Paths.get("src/test/resources", "N1QL.properties");
     private static Properties N1QL = new Properties();
     
-    private static final Boolean PRINT_TO_CONSOLE = Boolean.TRUE;
+    private static final Boolean PRINT_TO_CONSOLE = Boolean.FALSE;
     private static final Boolean REPLACE_EXPECTED = Boolean.FALSE;
     
     private static TransformationMetadata queryMetadataInterface() {
@@ -215,6 +215,9 @@ public class TestN1QLVisitor {
         
         sql = "SELECT ALL Name FROM Customer";
         helpTest(sql, N1QL0106);
+        
+        sql = "SELECT CreditCard_CardNumber, CreditCard_Type, CreditCard_CVN, CreditCard_Expiry FROM Oder";
+        helpTest(sql, N1QL0107);
     }
 
     @Test
@@ -222,6 +225,9 @@ public class TestN1QLVisitor {
         
         String sql = "SELECT * FROM T3";
         helpTest(sql, N1QL0201);
+        
+        sql = "SELECT nestedJson_nestedJson_nestedJson_Dimension FROM T3";
+        helpTest(sql, N1QL0202);
     }
     
     @Test
@@ -241,6 +247,9 @@ public class TestN1QLVisitor {
         
         sql = "SELECT * FROM T3_nestedArray_dim2_dim3_dim4";
         helpTest(sql, N1QL0305);
+        
+        sql = "SELECT T3_nestedArray_dim2_dim3_dim4_idx, T3_nestedArray_dim2_dim3_dim4 FROM T3_nestedArray_dim2_dim3_dim4";
+        helpTest(sql, N1QL0306);
     }
     
     @Test
@@ -277,6 +286,12 @@ public class TestN1QLVisitor {
         
         sql = "SELECT Name, type FROM Customer ORDER BY type"; //NullOrdering
         helpTest(sql, N1QL0603);
+        
+        sql = "SELECT Name, type FROM Customer ORDER BY Name ASC";
+        helpTest(sql, N1QL0604);
+        
+        sql = "SELECT Name, type FROM Customer ORDER BY Name DESC";
+        helpTest(sql, N1QL0605);
     }
     
     @Test
@@ -413,39 +428,34 @@ public class TestN1QLVisitor {
         N1QL0104,
         N1QL0105,
         N1QL0106,
-        
+        N1QL0107,
         N1QL0201,
         N1QL0202,
-        
         N1QL0301,
         N1QL0302,
         N1QL0303,
         N1QL0304,
         N1QL0305,
         N1QL0306,
-        
         N1QL0401,
         N1QL0402,
         N1QL0403,
-        
         N1QL0501,
         N1QL0502,
         N1QL0503,
-        
         N1QL0601,
         N1QL0602,
         N1QL0603,
-        
+        N1QL0604,
+        N1QL0605,
         N1QL0701,
         N1QL0702,
-        
         N1QL0801,
         N1QL0802,
         N1QL0803,
         N1QL0804,
         N1QL0805,
         N1QL0806,
-        
         N1QL0901,
         N1QL0902,
         N1QL0903,
@@ -455,22 +465,18 @@ public class TestN1QLVisitor {
         N1QL0907,
         N1QL0908,
         N1QL0909,
-        
         N1QL1001,
         N1QL1002,
         N1QL1003,
         N1QL1004,
         N1QL1005,
-        
         N1QL1101,
         N1QL1102,
-        
         N1QL1201,
         N1QL1202,
         N1QL1203,
         N1QL1204,
         N1QL1205,
-        
         N1QL1301,
         N1QL1302,
         N1QL1303,
@@ -479,7 +485,6 @@ public class TestN1QLVisitor {
         N1QL1306,
         N1QL1307,
         N1QL1308,
-        
         N1QL1401,
         N1QL1501
     }

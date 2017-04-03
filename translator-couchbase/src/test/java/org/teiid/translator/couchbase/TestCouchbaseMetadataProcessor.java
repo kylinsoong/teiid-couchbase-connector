@@ -339,7 +339,7 @@ public class TestCouchbaseMetadataProcessor {
                                 .add(JsonObject.create().put("Name", "Nested Json"))));
     }
 
-    private static final boolean PRINT_TO_CONSOLE = true;
+    private static final boolean PRINT_TO_CONSOLE = false;
     private static final boolean REPLACE_EXPECTED = false;
     
     private void helpTest(String name, MetadataFactory mf) throws ResourceException {
