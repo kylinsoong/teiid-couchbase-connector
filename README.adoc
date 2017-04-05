@@ -1,0 +1,135 @@
+
+== About the Teiid Couchbase Connector
+
+The Couchbase Connector is one of Teiid Connectors provide a SQL Integration solution for integrating your JSON with relational model, which allows applications to use normal SQL queries against Couchbase Server, translating standard SQL-92 queries into equivalent N1QL client API calls.
+
+
+== Generating Schema
+
+Couchbase is able to store data that does not follow the rules of data typing and structure that apply to traditional relational tables and columns. Couchbase data is organized into buckets and documents, which can contain nested arrays or arrays of differently-typed elements. Because traditional JDBC toolsets might not support these data structures, the data needs to be mapped to a relational form. To achieve this, the Couchbase Connector will sample data from a Couchbase server(namespace) and then generate the schema that is needed for JDBC applications. When a VDB has defined a Couchbase Source, the connector will automatically generates schema. 
+
+To ensure consistent support for your Couchbase data, use the importer properties to do futher defining in shcema generation.
+
+[source,xml]
+----
+<model name="CouchbaseModel">
+    <property name="importer.sampleSize" value="10"/>
+    <property name="importer.typeNameList" value="`test`:`type`"/>
+    <source name="couchbase" translator-name="translator-couchbase" connection-jndi-name="java:/couchbaseDS"/>
+</model>
+----
+
+* SampleSize - Set the SampleSize property to the number of documents that you want the connector to sample to detect the structure of the data.
+* TypeNameList - Set the TypeNameList property to a comma-separated list of the attributes that the buckets use to specify document types. Each list item must be a bucket name surrounded by  back quotes (`), a colon (:), and an attribute name surrounded by back quotes (`). For example, the following TypeNameList setting indicates that the test, default, and beer-sample buckets use the type attribute to specify the type of each document,
+
+[source,text]
+----
+TypeNameList=`test`:`type`,`default`:`type`,`beer-sample`:`type`
+----
+
+When generating a schema, the connector creates a base table for each different document type specified by the attributes in the list. For example, if the `test` bucket contains documents that have the type values `Customer` and `Order`, then the connector creates two tables named `Customer` and `Order` in the schema. 
+
+A `ISARRAYTABLE` OPTION in table used to differentiate the array table and normal document mapped table. 
+
+* A normal table represent data from collections of Couchbase documents. Documents appear as rows, and all attributes that are not arrays appear as columns. In each table, the primary key column named as documentID that that identifies which Couchbase document each row comes from. If no typed name defined the table name is the keyspace name, but in the Couchbase layer, the name of the table will be translate to keyspace anme.
+* If a table defined the `ISARRAYTABLE` OPTION, then it provide support for arrays, each array table contains the data from one array, and each row in the table represents an element from the array. If an element contains an nested array, an additional virtual tables as needed to expand the nested data. In each array table there also has a documentID column play as a foreign key that identifies the Couchbase document the array comes from and references the documentID from normal table. An index column (with the suffix _IDX in its name) to indicate the position of the element within the array.
+
+=== Example of Table Creation during Schema Generation
+
+The following example shows the tables that the Couchbase connector would generate if it connected to a Couchbase, the keyspace named `test` under namespace `default` contains two kinds of documents named `Customer` and `Order`.
+
+The `Customer` document is of type Customer and contains the following attributes. The SavedAddresses attribute is an array.
+
+[source,text]
+----
+{
+  "ID": "Customer_12345",
+  "Name": "John Doe",
+  "SavedAddresses": [
+    "123 Main St.",
+    "456 1st Ave"
+  ],
+  "type": "Customer"
+}
+----
+
+The `Order` document is of type Order and contains the following attributes. The CreditCard attribute is an object, and the Items attribute is an array of objects.
+
+[source,text]
+----
+{
+  "CreditCard": {
+    "CVN": 123,
+    "CardNumber": "4111 1111 1111 111",
+    "Expiry": "12/12",
+    "Type": "Visa"
+  },
+  "CustomerID": "Customer_12345",
+  "Items": [
+    {
+      "ItemID": 89123,
+      "Quantity": 1
+    },
+    {
+      "ItemID": 92312,
+      "Quantity": 5
+    }
+  ],
+  "Name": "Air Ticket",
+  "type": "Oder"
+}
+----
+
+When the VDP deploy and load metedata, the connector exposes these collections as two tables show as below:
+
+[source,sql]
+----
+SQL: SELECT * FROM Customer
++------------+----------------+----------+----------+
+| documentID |       ID       |   type   |   Name   |
++------------+----------------+----------+----------+
+| customer-1 | Customer_12345 | Customer | John Doe |
+| customer-2 | Customer_12345 | Customer | John Doe |
++------------+----------------+----------+----------+
+----
+
+[source,sql]
+----
+SQL: SELECT * FROM Oder
++------------+----------------+------+-----------------------+-----------------+----------------+-------------------+------------+
+| documentID |   CustomerID   | type | CreditCard_CardNumber | CreditCard_Type | CreditCard_CVN | CreditCard_Expiry |    Name    |
++------------+----------------+------+-----------------------+-----------------+----------------+-------------------+------------+
+| order-1    | Customer_12345 | Oder | 4111 1111 1111 111    | Visa            |            123 | 12/12             | Air Ticket |
+| order-2    | Customer_12345 | Oder | 4111 1111 1111 111    | Visa            |            123 | 12/12             | Air Ticket |
++------------+----------------+------+-----------------------+-----------------+----------------+-------------------+------------+
+----
+
+The SavedAddresses array from the Customer and the Items array from the Order document do not appear in above table. Instead, the following tables are generated for each array:
+
+[source,sql]
+----
+SQL: SELECT * FROM Customer_SavedAddresses
++------------+-----------------------------+-------------------------+
+| documentID | Customer_SavedAddresses_idx | Customer_SavedAddresses |
++------------+-----------------------------+-------------------------+
+| customer-1 |                           0 | 123 Main St.            |
+| customer-1 |                           1 | 456 1st Ave             |
+| customer-2 |                           0 | 123 Main St.            |
+| customer-2 |                           1 | 456 1st Ave             |
++------------+-----------------------------+-------------------------+
+----
+
+[source,sql]
+----
+SQL: SELECT * FROM Oder_Items
++------------+----------------+---------------------+-------------------+
+| documentID | Oder_Items_idx | Oder_Items_Quantity | Oder_Items_ItemID |
++------------+----------------+---------------------+-------------------+
+| order-1    |              0 |                   1 |             89123 |
+| order-1    |              1 |                   5 |             92312 |
+| order-2    |              0 |                   1 |             89123 |
+| order-2    |              1 |                   5 |             92312 |
++------------+----------------+---------------------+-------------------+
+----
+
+
